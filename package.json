@@ -9,13 +9,20 @@
     "dev": "concurrently --names \"server,inngest\" --prefix-colors \"cyan,yellow\" --kill-others-on-fail \"tsx watch --env-file .env.local src/index.ts\" \"npx inngest-cli@latest dev -u http://localhost:3000/api/inngest\"",
     "build": "tsc",
     "start": "node dist/index.js",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "db:setup": "tsx --env-file .env.local scripts/setup-db.ts",
+    "db:seed": "tsx --env-file .env.local scripts/seed-data.ts",
+    "email:preview": "tsx --env-file .env.local scripts/test-email-preview.ts"
   },
   "dependencies": {
-    "inngest": "^3.0.0"
+    "@neondatabase/serverless": "^1.0.2",
+    "inngest": "^3.0.0",
+    "resend": "^3.5.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/ws": "^8.18.1",
     "concurrently": "^9.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"

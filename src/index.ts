@@ -2,6 +2,9 @@ import { createServer } from "node:http";
 import { serve } from "inngest/node";
 import { inngest } from "./inngest/client";
 import { functions } from "./inngest/functions/index";
+import { config } from "./lib/config";
+import { checkDbConnection } from "./lib/db";
+import { log } from "./utils/logger";
 
 const handler = serve({ client: inngest, functions });
 
@@ -23,4 +26,6 @@ const server = createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
   console.log(`Inngest serve handler ready at http://localhost:${PORT}/api/inngest`);
+  log(`Config loaded: env=${config.env}, emailMode=${config.emailMode}`);
+  checkDbConnection();
 });

@@ -17,8 +17,9 @@ cd sol-notificaiton-service
 npm install
 
 # 2. Configure environment
-cp .env.example .env.local
-# No changes needed for local development — defaults work out of the box
+cp .env.local.example .env.local
+# Set DATABASE_URL to your Neon dev branch connection string
+# All other values have sensible defaults for local development
 
 # 3. Start the dev environment
 npm run dev
@@ -46,9 +47,26 @@ npm run dev
 
 ## Commands
 
-```bash
-npm run dev         # Start app server + Inngest Dev Server
-npm run build       # Compile TypeScript to dist/
-npm run start       # Run compiled output
-npm run type-check  # Type-check without emitting
-```
+### Development
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start the app server and Inngest Dev Server concurrently |
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm run start` | Run the compiled output from `dist/` |
+| `npm run type-check` | Type-check all source files without emitting output |
+
+### Database
+
+| Command | Description |
+|---------|-------------|
+| `npm run db:setup` | Create all required tables in the database (idempotent — safe to re-run) |
+| `npm run db:seed` | Insert test client records into the database (skips existing rows) |
+
+> Both database commands read `DATABASE_URL` from `.env.local`. Run `db:setup` before `db:seed` on a fresh database.
+
+### Email
+
+| Command | Description |
+|---------|-------------|
+| `npm run email:preview` | Send a sample email in mock mode — writes rendered HTML to `.email-preview/last.html` and opens it in the browser. No real email is sent. |
