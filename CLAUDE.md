@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-02-23
 
 ## Active Technologies
+- TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (existing), `@neondatabase/serverless ^0.9.x` (to install), `resend ^3.5.0` (existing), `tsx ^4.x` (existing) (002-core-infrastructure)
+- Neon PostgreSQL (serverless) via `@neondatabase/serverless` Pool (WebSocket transport) (002-core-infrastructure)
 
 - TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (runtime); `concurrently ^9.x`, `tsx ^4.x`, (001-inngest-dev-setup)
 
@@ -39,6 +41,7 @@ npm run type-check   # Type-check without emitting
 - See `.specify/memory/constitution.md` for full architectural rules
 
 ## Recent Changes
+- 002-core-infrastructure: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (existing), `@neondatabase/serverless ^0.9.x` (to install), `resend ^3.5.0` (existing), `tsx ^4.x` (existing)
 
 - 001-inngest-dev-setup: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (runtime); `concurrently ^9.x`, `tsx ^4.x`,
 
