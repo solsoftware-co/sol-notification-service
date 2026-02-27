@@ -62,6 +62,13 @@ has_git() {
     git rev-parse --show-toplevel >/dev/null 2>&1
 }
 
+# Strip branch type prefix (feature/, fix/, chore/, docs/, refactor/, etc.)
+# so that "feature/004-testing-ci" becomes "004-testing-ci"
+strip_branch_type_prefix() {
+    local branch="$1"
+    echo "${branch#*/}"
+}
+
 check_feature_branch() {
     local branch="$1"
     local has_git_repo="$2"
@@ -72,9 +79,12 @@ check_feature_branch() {
         return 0
     fi
 
-    if [[ ! "$branch" =~ ^[0-9]{3}- ]]; then
+    local stripped
+    stripped=$(strip_branch_type_prefix "$branch")
+
+    if [[ ! "$stripped" =~ ^[0-9]{3}- ]]; then
         echo "ERROR: Not on a feature branch. Current branch: $branch" >&2
-        echo "Feature branches should be named like: 001-feature-name" >&2
+        echo "Feature branches should be named like: feature/001-feature-name or 001-feature-name" >&2
         return 1
     fi
 
@@ -87,7 +97,8 @@ get_feature_dir() { echo "$1/specs/$2"; }
 # This allows multiple branches to work on the same spec (e.g., 004-fix-bug, 004-add-feature)
 find_feature_dir_by_prefix() {
     local repo_root="$1"
-    local branch_name="$2"
+    local branch_name
+    branch_name=$(strip_branch_type_prefix "$2")
     local specs_dir="$repo_root/specs"
 
     # Extract numeric prefix from branch (e.g., "004" from "004-whatever")

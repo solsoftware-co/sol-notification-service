@@ -5,6 +5,7 @@ Auto-generated from all feature plans. Last updated: 2026-02-23
 ## Active Technologies
 - TypeScript 5.x / Node.js 20+ + All from 002 — `inngest ^3.x`, `@neondatabase/serverless`, `resend`, `ws`, `tsx` (003-form-notification)
 - No new tables — reads `clients` table via existing `getClientById()` (003-form-notification)
+- N/A — no database schema changes; all DB calls replaced with `vi.fn()` stubs (feature/004-testing-ci)
 
 - TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x`, `resend ^3.x`, `ws ^8.x`, `concurrently ^9.x`, `tsx ^4.x`
 - Neon PostgreSQL via `@neondatabase/serverless` Pool (WebSocket transport)
@@ -63,26 +64,36 @@ npm run email:preview  # Send a mock email and open the HTML preview in the brow
 - See `.specify/memory/constitution.md` for full architectural rules
 
 ## Recent Changes
+- feature/004-testing-ci: Added TypeScript 5.x / Node.js 20+
 - 003-form-notification: Added TypeScript 5.x / Node.js 20+ + All from 002 — `inngest ^3.x`, `@neondatabase/serverless`, `resend`, `ws`, `tsx`
 - 002-core-infrastructure: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (existing), `@neondatabase/serverless ^0.9.x` (to install), `resend ^3.5.0` (existing), `tsx ^4.x` (existing)
 
-- 001-inngest-dev-setup: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (runtime); `concurrently ^9.x`, `tsx ^4.x`,
 
 <!-- MANUAL ADDITIONS START -->
 ## Git Conventions
 
 ### Branch Naming
 
-All feature branches must follow this pattern:
+All branches MUST use a type prefix followed by the spec ID and a short description:
 
 ```
-feature/<spec-id>-<short-description>
+<type>/<spec-id>-<short-description>
 ```
+
+| Prefix | When to use |
+|--------|-------------|
+| `feature/` | New functionality from a spec |
+| `fix/` | Bug fix (reference spec ID if applicable) |
+| `chore/` | Tooling, deps, config — no user-facing change |
+| `docs/` | Documentation only |
+| `refactor/` | Code restructure with no behaviour change |
 
 Examples:
 - `feature/001-inngest-dev-setup`
-- `feature/002-email-notifications`
-- `feature/003-webhook-handler`
+- `feature/004-testing-ci`
+- `fix/003-form-notification-missing-field`
+- `chore/001-update-deps`
+- `docs/002-readme-commands`
 
-The `<spec-id>` matches the directory name under `specs/`. Never create branches without the `feature/` prefix.
+The `<spec-id>` matches the directory name under `specs/`. Never create a branch without one of the prefixes above.
 <!-- MANUAL ADDITIONS END -->
