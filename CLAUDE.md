@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-02-23
 
 ## Active Technologies
+- TypeScript 5.x / Node.js 20+ + All from 002 — `inngest ^3.x`, `@neondatabase/serverless`, `resend`, `ws`, `tsx` (003-form-notification)
+- No new tables — reads `clients` table via existing `getClientById()` (003-form-notification)
 
 - TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x`, `resend ^3.x`, `ws ^8.x`, `concurrently ^9.x`, `tsx ^4.x`
 - Neon PostgreSQL via `@neondatabase/serverless` Pool (WebSocket transport)
@@ -61,6 +63,7 @@ npm run email:preview  # Send a mock email and open the HTML preview in the brow
 - See `.specify/memory/constitution.md` for full architectural rules
 
 ## Recent Changes
+- 003-form-notification: Added TypeScript 5.x / Node.js 20+ + All from 002 — `inngest ^3.x`, `@neondatabase/serverless`, `resend`, `ws`, `tsx`
 - 002-core-infrastructure: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (existing), `@neondatabase/serverless ^0.9.x` (to install), `resend ^3.5.0` (existing), `tsx ^4.x` (existing)
 
 - 001-inngest-dev-setup: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (runtime); `concurrently ^9.x`, `tsx ^4.x`,
