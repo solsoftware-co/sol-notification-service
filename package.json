@@ -12,7 +12,8 @@
     "type-check": "tsc --noEmit",
     "db:setup": "tsx --env-file .env.local scripts/setup-db.ts",
     "db:seed": "tsx --env-file .env.local scripts/seed-data.ts",
-    "email:preview": "tsx --env-file .env.local scripts/test-email-preview.ts"
+    "email:preview": "tsx --env-file .env.local scripts/test-email-preview.ts",
+    "test:form": "tsx --env-file .env.local scripts/test-form-notification.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

@@ -48,3 +48,10 @@ export interface EmailResult {
 export interface BaseEventPayload {
   clientId: string;
 }
+
+export interface FormSubmittedPayload extends BaseEventPayload {
+  submitterName: string;
+  submitterEmail: string;
+  submitterMessage: string;
+  formId?: string;
+}
