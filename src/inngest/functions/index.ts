@@ -1,4 +1,5 @@
 import { helloWorld } from "./hello-world";
+import { sendFormNotification } from "./form-notification";
 
-export { helloWorld };
-export const functions = [helloWorld];
+export { helloWorld, sendFormNotification };
+export const functions = [helloWorld, sendFormNotification];
