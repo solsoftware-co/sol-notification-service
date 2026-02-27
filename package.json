@@ -13,7 +13,9 @@
     "db:setup": "tsx --env-file .env.local scripts/setup-db.ts",
     "db:seed": "tsx --env-file .env.local scripts/seed-data.ts",
     "email:preview": "tsx --env-file .env.local scripts/test-email-preview.ts",
-    "test:form": "tsx --env-file .env.local scripts/test-form-notification.ts"
+    "test:form": "tsx --env-file .env.local scripts/test-form-notification.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -22,10 +24,13 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@inngest/test": "^0.1.9",
     "@types/node": "^20.0.0",
     "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^2.1.9",
     "concurrently": "^9.0.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
   }
 }
