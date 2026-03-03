@@ -1,14 +1,11 @@
 # sol-notificaiton-service Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-02-23
+Auto-generated from all feature plans. Last updated: 2026-02-28
 
 ## Active Technologies
-- TypeScript 5.x / Node.js 20+ + All from 002 — `inngest ^3.x`, `@neondatabase/serverless`, `resend`, `ws`, `tsx` (003-form-notification)
-- No new tables — reads `clients` table via existing `getClientById()` (003-form-notification)
-- N/A — no database schema changes; all DB calls replaced with `vi.fn()` stubs (feature/004-testing-ci)
-
-- TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x`, `resend ^3.x`, `ws ^8.x`, `concurrently ^9.x`, `tsx ^4.x`
+- TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x`, `resend ^3.x`, `ws ^8.x`, `concurrently ^9.x`, `tsx ^4.x`, `@google-analytics/data ^4.x`
 - Neon PostgreSQL via `@neondatabase/serverless` Pool (WebSocket transport)
+- `GA4_SERVICE_ACCOUNT_JSON` env var — service account JSON string; required in production, optional in dev/preview (returns mock data when absent)
 
 ## Project Structure
 
@@ -19,7 +16,8 @@ src/
 │   └── index.ts                    # All shared TypeScript types and event payload interfaces
 ├── lib/
 │   ├── config.ts                   # Environment config singleton (single source of truth)
-│   ├── db.ts                       # Neon Pool singleton + getClientById()
+│   ├── db.ts                       # Neon Pool singleton + getClientById() + getAllActiveClients()
+│   ├── analytics.ts                # GA4 Data API wrapper — getAnalyticsReport(), mock/live routing
 │   └── email.ts                    # Email abstraction (mock/test/live routing)
 ├── utils/
 │   ├── logger.ts                   # Structured logger ([env] [clientId=...] prefix)
@@ -29,7 +27,9 @@ src/
     └── functions/
         ├── index.ts                # Barrel: export const functions = [...]
         ├── template.ts             # Canonical workflow template — copy, do not register
-        └── hello-world.ts          # Example stub function
+        ├── hello-world.ts          # Example stub function
+        ├── weekly-analytics-scheduler.ts  # Cron (Tue 09:00 UTC) + manual trigger; fans out per-client events
+        └── weekly-analytics-report.ts     # Per-client worker: fetch GA4 data, build + send email
 
 scripts/
 ├── setup-db.ts                     # Idempotent table creation (npm run db:setup)
@@ -64,9 +64,9 @@ npm run email:preview  # Send a mock email and open the HTML preview in the brow
 - See `.specify/memory/constitution.md` for full architectural rules
 
 ## Recent Changes
-- feature/004-testing-ci: Added TypeScript 5.x / Node.js 20+
-- 003-form-notification: Added TypeScript 5.x / Node.js 20+ + All from 002 — `inngest ^3.x`, `@neondatabase/serverless`, `resend`, `ws`, `tsx`
-- 002-core-infrastructure: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (existing), `@neondatabase/serverless ^0.9.x` (to install), `resend ^3.5.0` (existing), `tsx ^4.x` (existing)
+- 005-weekly-analytics-report: Added `@google-analytics/data ^4.x`; new functions `weekly-analytics-scheduler` + `weekly-analytics-report`; `GA4_SERVICE_ACCOUNT_JSON` env var; `getAllActiveClients()` in db.ts; `getAnalyticsReport()` in analytics.ts
+- feature/004-testing-ci: Vitest 2.x test suite + CI pipeline
+- 003-form-notification: `form-notification` workflow function
 
 
 <!-- MANUAL ADDITIONS START -->

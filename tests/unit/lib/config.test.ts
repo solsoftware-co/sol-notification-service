@@ -9,6 +9,7 @@ const ENV_KEYS = [
   "TEST_EMAIL",
   "RESEND_API_KEY",
   "EMAIL_MODE",
+  "GA4_SERVICE_ACCOUNT_JSON",
 ] as const;
 
 describe("buildConfig", () => {
@@ -48,6 +49,7 @@ describe("buildConfig", () => {
     process.env.DATABASE_URL = "postgresql://test";
     process.env.VERCEL_ENV = "production";
     process.env.RESEND_API_KEY = "re_test_key";
+    process.env.GA4_SERVICE_ACCOUNT_JSON = '{"type":"service_account"}';
 
     const { config } = await import("../../../src/lib/config");
 
@@ -60,5 +62,32 @@ describe("buildConfig", () => {
     await expect(import("../../../src/lib/config")).rejects.toThrow(
       /DATABASE_URL/
     );
+  });
+
+  it("GA4_SERVICE_ACCOUNT_JSON absent in development → ga4CredentialsJson is null, no throw", async () => {
+    process.env.DATABASE_URL = "postgresql://test";
+
+    const { config } = await import("../../../src/lib/config");
+
+    expect(config.ga4CredentialsJson).toBeNull();
+  });
+
+  it("GA4_SERVICE_ACCOUNT_JSON absent in production → throws", async () => {
+    process.env.DATABASE_URL = "postgresql://test";
+    process.env.VERCEL_ENV = "production";
+    process.env.RESEND_API_KEY = "re_test_key";
+
+    await expect(import("../../../src/lib/config")).rejects.toThrow(
+      /GA4_SERVICE_ACCOUNT_JSON/
+    );
+  });
+
+  it("GA4_SERVICE_ACCOUNT_JSON present → returned on config object", async () => {
+    process.env.DATABASE_URL = "postgresql://test";
+    process.env.GA4_SERVICE_ACCOUNT_JSON = '{"type":"service_account"}';
+
+    const { config } = await import("../../../src/lib/config");
+
+    expect(config.ga4CredentialsJson).toBe('{"type":"service_account"}');
   });
 });

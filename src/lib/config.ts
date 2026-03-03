@@ -48,7 +48,15 @@ function buildConfig(): AppConfig {
     );
   }
 
-  return { env, emailMode, testEmail, resendApiKey, resendFrom, databaseUrl };
+  const ga4CredentialsJson = process.env.GA4_SERVICE_ACCOUNT_JSON ?? null;
+
+  if (env === "production" && !ga4CredentialsJson) {
+    throw new Error(
+      "GA4_SERVICE_ACCOUNT_JSON environment variable is required in production"
+    );
+  }
+
+  return { env, emailMode, testEmail, resendApiKey, resendFrom, databaseUrl, ga4CredentialsJson };
 }
 
 export const config: AppConfig = buildConfig();

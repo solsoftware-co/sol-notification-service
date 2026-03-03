@@ -5,7 +5,7 @@ const clients = [
     id: "client-acme",
     name: "Acme Corp",
     email: "test-acme@example.com",
-    ga4_property_id: "properties/123456789",
+    ga4_property_id: "123456789", // numeric ID only — analytics.ts prefixes "properties/" internally
     active: true,
     settings: {},
   },
@@ -13,7 +13,7 @@ const clients = [
     id: "client-globex",
     name: "Globex Inc",
     email: "test-globex@example.com",
-    ga4_property_id: null,
+    ga4_property_id: null, // intentionally no GA4 — tests the "not configured" error path
     active: true,
     settings: {},
   },
@@ -26,7 +26,9 @@ async function seed(): Promise<void> {
     await db.query(
       `INSERT INTO clients (id, name, email, ga4_property_id, active, settings)
        VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (id) DO NOTHING`,
+       ON CONFLICT (id) DO UPDATE SET
+         ga4_property_id = EXCLUDED.ga4_property_id,
+         active = EXCLUDED.active`,
       [
         client.id,
         client.name,
