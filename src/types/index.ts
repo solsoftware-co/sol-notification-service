@@ -8,6 +8,66 @@ export interface AppConfig {
   resendApiKey: string | null;
   resendFrom: string;
   databaseUrl: string;
+  ga4CredentialsJson: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Analytics report types
+// ---------------------------------------------------------------------------
+
+export type ReportPeriodPreset =
+  | "last_week"
+  | "last_month"
+  | "last_30_days"
+  | "last_90_days"
+  | "custom";
+
+export interface ReportPeriod {
+  preset: ReportPeriodPreset;
+  start?: string; // ISO 8601 date — required when preset === "custom"
+  end?: string;   // ISO 8601 date — required when preset === "custom"
+}
+
+export interface ResolvedPeriod {
+  start: string;             // ISO 8601 date, e.g. "2026-02-16"
+  end: string;               // ISO 8601 date, e.g. "2026-02-22"
+  label: string;             // Human-readable, e.g. "Feb 16 – Feb 22, 2026"
+  preset: ReportPeriodPreset;
+}
+
+export interface TopPage {
+  path: string;  // e.g. "/", "/about"
+  views: number; // screenPageViews for the period
+}
+
+export interface TrafficSource {
+  source: string;   // e.g. "google", "direct"
+  sessions: number;
+}
+
+export interface DailyMetric {
+  date: string;       // ISO 8601 date
+  sessions: number;
+  activeUsers: number;
+  newUsers: number;
+}
+
+export interface AnalyticsReport {
+  sessions: number;
+  activeUsers: number;
+  newUsers: number;
+  avgSessionDurationSecs: number;
+  topPages: TopPage[];
+  topSources: TrafficSource[];
+  dailyMetrics: DailyMetric[];
+  resolvedPeriod: ResolvedPeriod;
+  isMock: boolean;
+}
+
+export interface AnalyticsReportRequestedPayload extends BaseEventPayload {
+  // clientId inherited from BaseEventPayload
+  reportPeriod: ReportPeriod;
+  scheduledAt: string; // ISO 8601 timestamp — used for preset resolution
 }
 
 export interface ClientRow {

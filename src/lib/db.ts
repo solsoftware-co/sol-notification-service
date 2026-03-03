@@ -50,6 +50,29 @@ export async function getClientById(id: string): Promise<ClientRow> {
   return client;
 }
 
+export async function getAllActiveClients(options?: {
+  testOnly?: boolean;
+  limit?: number;
+}): Promise<ClientRow[]> {
+  const conditions: string[] = ["active = TRUE"];
+  const values: unknown[] = [];
+
+  if (options?.testOnly) {
+    values.push("%test%");
+    conditions.push(`email LIKE $${values.length}`);
+  }
+
+  let sql = `SELECT id, name, email, ga4_property_id, active, settings, created_at FROM clients WHERE ${conditions.join(" AND ")}`;
+
+  if (options?.limit !== undefined) {
+    values.push(options.limit);
+    sql += ` LIMIT $${values.length}`;
+  }
+
+  const result = await query<ClientRow>(sql, values.length ? values : undefined);
+  return result.rows;
+}
+
 export async function checkDbConnection(): Promise<void> {
   try {
     await db.query("SELECT 1");
