@@ -201,7 +201,7 @@ const attachments = request.attachments?.map(a => ({
 ### Updated: `src/lib/templates.ts`
 
 `renderAnalyticsReportEmail` updated to:
-1. Fix banner attachment: add `content_type: 'image/png'`, `content_id: 'banner_image.png'`, remove old `headers` field
+1. Fix banner attachment in `loadBannerAttachment()`: add `content_type: 'image/png'`, `content_id: 'banner_image.png'`, remove old `headers` field — **this shared function is called by both `renderFormNotificationEmail` and `renderAnalyticsReportEmail`, so fixing it here fixes the banner for both the inquiry and analytics emails simultaneously**
 2. Generate three charts independently with `try/catch` each
 3. Add successful chart buffers as CID attachments
 4. Pass CID references (`'cid:chart_daily'` etc.) as optional props to the template
@@ -314,7 +314,7 @@ Global `fetch` is mocked via `vi.stubGlobal`. Tests are organised by layer:
 
 1. **Fix `EmailAttachment` type** — `src/types/index.ts`
 3. **Fix `email.ts` attachment mapping** — replace `headers` with `content_id`/`content_type`
-4. **Fix banner attachment** in `src/lib/templates.ts` — use `content_id`, drop `headers`
+4. **Fix `loadBannerAttachment()`** in `src/lib/templates.ts` — use `content_id`, drop `headers` (fixes banner inline embedding for both inquiry and analytics emails)
 5. **Create `src/lib/charts.ts`** — three chart generators
 6. **Wire charts in `templates.ts`** — generate, attach, pass CID refs
 7. **Update `analytics-report-v1.tsx`** — replace `charts[]` with per-section props
