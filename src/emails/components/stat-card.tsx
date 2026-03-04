@@ -20,7 +20,7 @@ export function StatCard({ metric }: StatCardProps) {
 
     return (
         <div style={{
-            backgroundColor: colors.bg,
+            backgroundColor: colors.shading,
             border: borders.card,
             borderRadius: radii.card,
             padding: spacing.lg,
