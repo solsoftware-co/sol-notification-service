@@ -1,8 +1,9 @@
-// T014 + T015 + T019: weekly-analytics-report unit tests
+// T014 + T015 + T019 + T029: weekly-analytics-report unit tests
 
 const mockGetClientById = vi.hoisted(() => vi.fn());
 const mockGetAnalyticsReport = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
+const mockRenderAnalyticsReport = vi.hoisted(() => vi.fn());
 
 // config MUST be mocked first to prevent throw-at-import from buildConfig()
 vi.mock("../../../../src/lib/config", () => ({
@@ -27,6 +28,10 @@ vi.mock("../../../../src/lib/analytics", () => ({
 
 vi.mock("../../../../src/lib/email", () => ({
   sendEmail: mockSendEmail,
+}));
+
+vi.mock("../../../../src/lib/templates", () => ({
+  renderAnalyticsReportEmail: mockRenderAnalyticsReport,
 }));
 
 vi.mock("../../../../src/utils/logger", () => ({
@@ -111,6 +116,11 @@ beforeEach(() => {
   mockGetClientById.mockResolvedValue(mockClient);
   mockGetAnalyticsReport.mockResolvedValue(mockReport);
   mockSendEmail.mockResolvedValue(mockEmailResult);
+  mockRenderAnalyticsReport.mockResolvedValue({
+    subject: "Your analytics report — Feb 16 \u2013 Feb 22, 2026",
+    html: "<html>mock</html>",
+    attachments: [],
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -402,6 +412,16 @@ describe("full execute — happy path, last_week", () => {
       outcome: "logged",
       isMock: true,
     });
+  });
+
+  it("calls renderAnalyticsReportEmail with report, client, and resolved period", async () => {
+    await t.execute();
+
+    expect(mockRenderAnalyticsReport).toHaveBeenCalledWith(
+      expect.objectContaining({ sessions: 100, isMock: true }),
+      expect.objectContaining({ id: "client-1" }),
+      expect.objectContaining({ preset: "last_week" }),
+    );
   });
 
   it("calls sendEmail with client email and resolved period label in subject", async () => {

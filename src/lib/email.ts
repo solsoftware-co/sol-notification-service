@@ -2,7 +2,7 @@ import { Resend } from "resend";
 import { config } from "./config";
 import { log } from "../utils/logger";
 import { writeEmailPreview } from "../utils/email-preview";
-import type { EmailRequest, EmailResult } from "../types/index";
+import type { EmailRequest, EmailResult, EmailAttachment } from "../types/index";
 
 function getResendClient(): Resend {
   if (!config.resendApiKey) {
@@ -47,11 +47,20 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
       : request.subject;
 
   const resend = getResendClient();
+  const attachments = request.attachments && request.attachments.length > 0
+    ? request.attachments.map((a: EmailAttachment) => ({
+        filename: a.filename,
+        content: a.content,
+        headers: a.headers,
+      }))
+    : undefined;
+
   const { data, error } = await resend.emails.send({
     from,
     to: actualTo,
     subject,
     html: request.html,
+    ...(attachments ? { attachments } : {}),
   });
 
   if (error) {
