@@ -4,11 +4,36 @@ import { colors, typography, radii, spacing } from '../styles';
 type CTAButtonProps = {
     href: string;
     label: string;
-    variant?: 'primary' | 'secondary';
+    variant?: 'primary' | 'secondary' | 'black';
+    size?: 'sm' | 'md' | 'lg';
+    radius?: 'default' | 'rounded';
 };
 
-export function CTAButton({ href, label, variant = 'primary' }: CTAButtonProps) {
-    const isPrimary = variant === 'primary';
+const variantStyles: Record<NonNullable<CTAButtonProps['variant']>, {
+    bg: string;
+    textColor: string;
+    border: string;
+}> = {
+    primary:   { bg: colors.accent,       textColor: '#FFFFFF',       border: 'none' },
+    secondary: { bg: 'transparent',       textColor: colors.accent,   border: `1.5px solid ${colors.accent}` },
+    black:     { bg: colors.textPrimary,  textColor: '#FFFFFF',       border: 'none' },
+};
+
+const sizeStyles: Record<NonNullable<CTAButtonProps['size']>, string> = {
+    sm: '8px 16px',
+    md: '12px 24px',
+    lg: '21px 42px',
+};
+
+const radiusStyles: Record<NonNullable<CTAButtonProps['radius']>, string> = {
+    default: radii.button,
+    rounded: '9999px',
+};
+
+export function CTAButton({ href, label, variant = 'primary', size = 'md', radius = 'default' }: CTAButtonProps) {
+    const { bg, textColor, border } = variantStyles[variant];
+    const padding = sizeStyles[size];
+    const borderRadius = radiusStyles[radius];
 
     return (
         <Section style={{ textAlign: 'center', paddingTop: spacing.md }}>
@@ -16,9 +41,9 @@ export function CTAButton({ href, label, variant = 'primary' }: CTAButtonProps) 
             <table role="presentation" cellPadding="0" cellSpacing="0" style={{ margin: '0 auto' }}>
                 <tr>
                     <td style={{
-                        backgroundColor: isPrimary ? colors.accent : 'transparent',
-                        borderRadius: radii.button,
-                        border: isPrimary ? 'none' : `1.5px solid ${colors.accent}`,
+                        backgroundColor: bg,
+                        borderRadius,
+                        border,
                     }}>
                         <a
                             href={href}
@@ -27,10 +52,10 @@ export function CTAButton({ href, label, variant = 'primary' }: CTAButtonProps) 
                                 fontFamily: typography.fontStack,
                                 fontSize: typography.sizes.body,
                                 fontWeight: typography.weights.medium,
-                                color: isPrimary ? '#FFFFFF' : colors.accent,
+                                color: textColor,
                                 textDecoration: 'none',
-                                padding: '12px 24px',
-                                borderRadius: radii.button,
+                                padding,
+                                borderRadius,
                             }}
                         >
                             {label}

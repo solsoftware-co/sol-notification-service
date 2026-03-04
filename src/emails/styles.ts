@@ -7,11 +7,11 @@ export const colors = {
   surface:       '#FFFFFF',  // card / content block background
   shading:       '#FBFBFC',  // subtle background shading
   border:        '#E4E4E7',  // card borders, dividers, table row separators
-  textPrimary:   '#09090B',  // headings, stat numbers, field values
+  textPrimary:   '#36363B',  // headings, stat numbers, field values
   textSecondary: '#52525B',  // body text, descriptions, context lines
   textMuted:     '#A1A1AA',  // footer, field labels, metadata
-  accent:        '#2563EB',  // links, CTA buttons, message-block left border
-  positive:      '#16A34A',  // upward trend indicators
+  accent:        '#5E96C7',  // links, CTA buttons, message-block left border
+  positive:      '#F7BC03',  // upward trend indicators
 } as const;
 
 export const typography = {

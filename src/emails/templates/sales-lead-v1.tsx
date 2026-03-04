@@ -145,7 +145,9 @@ export default function SalesLeadV1Email({
                     <CTAButton
                         href={`mailto:${customerEmail}`}
                         label={`Reply to ${customerName}`}
-                        variant="primary"
+                        variant="black"
+                        size="lg"
+                        radius="rounded"
                     />
 
                     <EmailFooter />

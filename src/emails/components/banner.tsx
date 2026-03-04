@@ -8,7 +8,7 @@ export function Banner() {
             role="presentation"
             style={{
                 paddingTop: spacing.xl,
-                paddingBottom: spacing.lg,
+                paddingBottom: spacing.xl,
             }}
         >
             <tr>
@@ -16,7 +16,7 @@ export function Banner() {
                     <Img
                         src="cid:banner_image.png"
                         alt="Sol Software"
-                        height="32"
+                        height="40"
                         style={{
                             display: 'block',
                             outline: 'none',
