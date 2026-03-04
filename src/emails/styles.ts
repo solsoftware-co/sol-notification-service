@@ -52,8 +52,9 @@ export const spacing = {
 } as const;
 
 export const radii = {
-  card:   '8px',
-  button: '6px',
+  container: '16px',
+  card:      '8px',
+  button:    '6px',
 } as const;
 
 export const borders = {

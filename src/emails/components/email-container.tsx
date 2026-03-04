@@ -12,7 +12,7 @@ export function EmailContainer({ children }: EmailContainerProps) {
             maxWidth: '800px',
             margin: '0 auto',
             backgroundColor: colors.surface,
-            borderRadius: radii.card,
+            borderRadius: radii.container,
             border: borders.card,
             padding: spacing.lg,
             marginBottom: spacing.xl,
