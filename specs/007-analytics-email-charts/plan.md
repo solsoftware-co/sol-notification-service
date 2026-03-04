@@ -83,41 +83,96 @@ scripts/
 
 Exports three async functions. Each builds a Chart.js config and POSTs it to the QuickChart API, returning a PNG Buffer. Brand colours from `src/emails/styles.ts` are applied directly in the Chart.js config.
 
+Three-layer call chain:
+
+```
+generateDailyTrendChart(metrics)   → generateAreaChart(labels, values)  → callQuickChart(config, h)
+generateTopSourcesChart(sources)   → generateBarChart(labels, values)   → callQuickChart(config, h)
+generateTopPagesChart(pages)       → generateBarChart(labels, values)   → callQuickChart(config, h)
+```
+
+**Layer 1 — `callQuickChart` (private)**: Raw HTTP transport. Accepts a fully-formed Chart.js config object and dimensions, POSTs to QuickChart, returns PNG Buffer.
+
 ```ts
-import { colors } from '../emails/styles';
-import type { DailyMetric, TrafficSource, TopPage } from '../types/index';
-
-const QUICKCHART_URL = 'https://quickchart.io/chart';
-const CHART_WIDTH = 760;
-
-export async function generateDailyTrendChart(metrics: DailyMetric[]): Promise<Buffer>
-export async function generateTopSourcesChart(sources: TrafficSource[]): Promise<Buffer>
-export async function generateTopPagesChart(pages: TopPage[]): Promise<Buffer>
-
-// Shared helper
 async function callQuickChart(chart: object, height: number): Promise<Buffer> {
-  const res = await fetch(QUICKCHART_URL, {
+  const res = await fetch('https://quickchart.io/chart', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chart, width: CHART_WIDTH, height, format: 'png', backgroundColor: colors.surface }),
+    body: JSON.stringify({ chart, width: 760, height, format: 'png', backgroundColor: colors.surface }),
   });
   if (!res.ok) throw new Error(`QuickChart ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }
 ```
 
-**Area chart (daily trend)** — 760 × 220px:
-- `type: 'line'`, `fill: true`
-- `borderColor: colors.accent` (`#5E96C7`), `backgroundColor: 'rgba(94,150,199,0.15)'`
-- `tension: 0.3` for gentle curve, `pointRadius: 3`
-- X-axis tick labels: shortened date (e.g. "Feb 23"), `colors.textMuted`
-- Legend hidden; grid lines `colors.border`
+**Layer 2 — `generateAreaChart` / `generateBarChart` (private)**: Build the branded Chart.js config from generic `labels: string[]` + `values: number[]` inputs. This is the single source of truth for all visual styling — colours, fonts, grid lines, legend visibility. Any future change to chart appearance (e.g. colour, tension, bar radius) is made here once and applies to all charts of that type.
 
-**Horizontal bar chart (sources / pages)** — 760 × dynamic (40px × N items + 40px padding):
-- `type: 'bar'`, `indexAxis: 'y'`
-- `backgroundColor: colors.accent`, `borderRadius: 4`
-- Labels truncated at 30 chars on the y-axis
-- Legend hidden; value labels on bars via `datalabels` plugin (QuickChart supports this built-in)
+```ts
+// Area chart — used for time-series data (daily sessions)
+async function generateAreaChart(labels: string[], values: number[], height = 220): Promise<Buffer> {
+  return callQuickChart({
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ data: values, fill: true,
+        borderColor: colors.accent,
+        backgroundColor: 'rgba(94,150,199,0.15)',
+        pointRadius: 3, tension: 0.3, borderWidth: 2 }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: colors.textMuted, font: { size: 11 } }, grid: { color: colors.border } },
+        y: { ticks: { color: colors.textMuted, font: { size: 11 } }, grid: { color: colors.border } },
+      },
+    },
+  }, height);
+}
+
+// Horizontal bar chart — used for ranked categorical data (sources, pages)
+async function generateBarChart(labels: string[], values: number[], height?: number): Promise<Buffer> {
+  const h = height ?? labels.length * 40 + 40;
+  return callQuickChart({
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: values,
+        backgroundColor: colors.accent,
+        borderRadius: 4 }],
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: colors.textMuted, font: { size: 11 } }, grid: { color: colors.border } },
+        y: { ticks: { color: colors.textSecondary, font: { size: 11 } } },
+      },
+    },
+  }, h);
+}
+```
+
+**Layer 3 — public exports**: Domain-specific functions that transform typed data into `labels`/`values` arrays and delegate to the appropriate chart primitive.
+
+```ts
+export async function generateDailyTrendChart(metrics: DailyMetric[]): Promise<Buffer> {
+  const labels = metrics.map(m => m.date.slice(5)); // "MM-DD"
+  const values = metrics.map(m => m.sessions);
+  return generateAreaChart(labels, values);
+}
+
+export async function generateTopSourcesChart(sources: TrafficSource[]): Promise<Buffer> {
+  const labels = sources.map(s => s.source.length > 30 ? s.source.slice(0, 29) + '…' : s.source);
+  const values = sources.map(s => s.sessions);
+  return generateBarChart(labels, values);
+}
+
+export async function generateTopPagesChart(pages: TopPage[]): Promise<Buffer> {
+  const labels = pages.map(p => p.path.length > 30 ? p.path.slice(0, 29) + '…' : p.path);
+  const values = pages.map(p => p.views);
+  return generateBarChart(labels, values);
+}
+```
 
 ### Updated: `src/types/index.ts`
 
@@ -227,15 +282,24 @@ function inlineImages(html: string, attachments: EmailAttachment[]): string {
 
 ### Unit tests: `tests/unit/lib/charts.test.ts` (new)
 
-The QuickChart `fetch` call is mocked (`vi.mock` on global fetch). Tests verify the Chart.js config shape sent to QuickChart and that the returned buffer is passed through correctly.
+Global `fetch` is mocked via `vi.stubGlobal`. Tests are organised by layer:
 
-- `generateDailyTrendChart` calls QuickChart with `type: 'line'` and correct data labels/values
-- `generateDailyTrendChart` with 0 items throws (triggering graceful fallback upstream)
-- `generateTopSourcesChart` calls QuickChart with `type: 'bar'` and `indexAxis: 'y'`
-- `generateTopPagesChart` truncates labels longer than 30 chars in the config sent to QuickChart
-- All three functions propagate errors from a non-ok QuickChart response (verifies fallback logic)
+**`callQuickChart` (via public exports)**:
+- Non-ok HTTP response throws an Error (triggers graceful fallback in `templates.ts`)
+- Returned `arrayBuffer()` is converted to a Buffer
 
-> Visual correctness is validated via `npm run email:preview` (manual review). Unit tests verify config correctness and error propagation only.
+**`generateAreaChart` / `generateBarChart` (via public exports)**:
+- Area chart config has `type: 'line'`, `fill: true`, `borderColor: colors.accent`
+- Bar chart config has `type: 'bar'`, `indexAxis: 'y'`, `borderRadius: 4`
+- Both pass `backgroundColor: colors.surface` as the chart background
+
+**Public exports (data-to-chart mapping)**:
+- `generateDailyTrendChart` maps `DailyMetric.sessions` to values; dates formatted as `MM-DD`
+- `generateTopSourcesChart` truncates source labels > 30 chars with `…`
+- `generateTopPagesChart` truncates page path labels > 30 chars with `…`
+- All three propagate thrown errors for upstream try/catch handling
+
+> Visual correctness validated via `npm run email:preview` (manual review).
 
 ### Updated tests: `tests/unit/lib/templates.test.ts`
 
