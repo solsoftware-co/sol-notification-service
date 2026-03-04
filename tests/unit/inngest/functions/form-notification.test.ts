@@ -1,6 +1,9 @@
 import { InngestTestEngine, mockCtx } from "@inngest/test";
 import type { ClientRow, EmailResult } from "../../../../src/types/index";
 
+// Hoisted mock refs — declared before vi.mock() factories
+const mockRenderFormNotification = vi.hoisted(() => vi.fn());
+
 // T006: Mock declarations — hoisted above all imports by Vitest
 // config MUST be first to prevent throw-at-import from buildConfig()
 vi.mock("../../../../src/lib/config", () => ({
@@ -20,6 +23,10 @@ vi.mock("../../../../src/lib/db", () => ({
 
 vi.mock("../../../../src/lib/email", () => ({
   sendEmail: vi.fn(),
+}));
+
+vi.mock("../../../../src/lib/templates", () => ({
+  renderFormNotificationEmail: mockRenderFormNotification,
 }));
 
 vi.mock("../../../../src/utils/logger", () => ({
@@ -61,8 +68,14 @@ const mockEmailResult: EmailResult = {
   mode: "mock",
   originalTo: "owner@acme.com",
   actualTo: "owner@acme.com",
-  subject: "New form submission: contact",
+  subject: "New inquiry — Acme Corp",
   outcome: "logged",
+};
+
+const mockRenderResult = {
+  subject: "New inquiry — Acme Corp",
+  html: "<html>mock</html>",
+  attachments: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -82,6 +95,7 @@ const t = new InngestTestEngine({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mockRenderFormNotification.mockResolvedValue(mockRenderResult);
 });
 
 // ---------------------------------------------------------------------------
@@ -168,18 +182,23 @@ describe("send-email", () => {
     vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
   });
 
-  it("calls sendEmail with the client email and correct subject", async () => {
+  it("calls renderFormNotificationEmail with payload and client, then sendEmail with rendered result", async () => {
     const tWithClient = t.clone({
       steps: [{ id: "fetch-client-config", handler: () => mockClient }],
     });
 
     await tWithClient.executeStep("send-email");
 
+    expect(mockRenderFormNotification).toHaveBeenCalledOnce();
+    expect(mockRenderFormNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ submitterName: "Jane Smith" }),
+      mockClient,
+    );
     expect(sendEmail).toHaveBeenCalledOnce();
     expect(sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "owner@acme.com",
-        subject: "New form submission: contact",
+        subject: "New inquiry — Acme Corp",
       })
     );
   });

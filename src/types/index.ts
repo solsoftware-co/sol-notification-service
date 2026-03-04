@@ -77,7 +77,7 @@ export interface ClientRow {
   ga4_property_id: string | null;
   active: boolean;
   settings: Record<string, unknown>;
-  created_at: Date;
+  created_at: Date | string; // Date from DB; Inngest step serialization yields string
 }
 
 export interface NotificationLogRow {
@@ -89,11 +89,28 @@ export interface NotificationLogRow {
   created_at: Date;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer | string;
+  headers?: {
+    'Content-ID': string;
+    'Content-Disposition'?: string;
+  };
+}
+
+export interface EmailRenderResult {
+  subject: string;
+  html: string;
+  previewText?: string;
+  attachments: EmailAttachment[];
+}
+
 export interface EmailRequest {
   to: string;
   subject: string;
   html: string;
   from?: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface EmailResult {

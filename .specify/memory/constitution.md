@@ -163,6 +163,7 @@ constitution amendment (MINOR bump minimum; MAJOR if a core service is replaced)
 | AI Provider | Anthropic Claude (anthropic SDK) | ^0.x |
 | Analytics | Google Analytics 4 (@google-analytics/data) | ^4.x |
 | Local dev tooling | tsx | ^4.x |
+| Email rendering | React + React Email | react ^18, @react-email/components ^0.0.x, @react-email/render ^1.x |
 
 **Explicitly out-of-scope for PoC:** SMS (Twilio), Slack, push notifications (Firebase),
 client self-service UI, advanced analytics, load testing infrastructure.
