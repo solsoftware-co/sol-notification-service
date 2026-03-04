@@ -1,12 +1,13 @@
-import { Html, Head, Preview, Body, Container, Text, Link } from '@react-email/components';
+import { Html, Head, Preview, Body, Text, Link } from '@react-email/components';
 import { Banner } from '../components/banner';
+import { EmailContainer } from '../components/email-container';
 import { EmailHeader } from '../components/email-header';
 import { EmailFooter } from '../components/email-footer';
 import { SectionDivider } from '../components/section-divider';
 import { FieldGroup } from '../components/field-group';
 import { MessageBlock } from '../components/message-block';
 import { CTAButton } from '../components/cta-button';
-import { colors, typography, spacing, borders, radii } from '../styles';
+import { colors, typography, spacing } from '../styles';
 
 export type InquiryEmailProps = {
     previewText: string;
@@ -56,15 +57,7 @@ export default function SalesLeadV1Email({
             <Body style={{ backgroundColor: colors.bg, margin: '0', padding: '0' }}>
                 <Banner />
 
-                <Container style={{
-                    maxWidth: '600px',
-                    margin: '0 auto',
-                    backgroundColor: colors.surface,
-                    borderRadius: radii.card,
-                    border: borders.card,
-                    padding: spacing.lg,
-                    marginBottom: spacing.xl,
-                }}>
+                <EmailContainer>
                     <EmailHeader subheader={subheader} header={header} />
 
                     <SectionDivider />
@@ -156,7 +149,7 @@ export default function SalesLeadV1Email({
                     />
 
                     <EmailFooter />
-                </Container>
+                </EmailContainer>
             </Body>
         </Html>
     );

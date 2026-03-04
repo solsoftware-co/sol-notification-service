@@ -1,6 +1,7 @@
-import { Html, Head, Preview, Body, Container } from '@react-email/components';
-import { colors, spacing, borders, radii } from '../styles';
+import { Html, Head, Preview, Body } from '@react-email/components';
+import { colors } from '../styles';
 import { Banner } from '../components/banner';
+import { EmailContainer } from '../components/email-container';
 import { EmailHeader } from '../components/email-header';
 import { EmailFooter } from '../components/email-footer';
 import { SectionDivider } from '../components/section-divider';
@@ -47,15 +48,7 @@ export default function AnalyticsReportV1Email({
             </Head>
             <Body style={{ backgroundColor: colors.bg, margin: '0', padding: '0' }}>
                 <Banner />
-                <Container style={{
-                    maxWidth: '600px',
-                    margin: '0 auto',
-                    backgroundColor: colors.surface,
-                    borderRadius: radii.card,
-                    border: borders.card,
-                    padding: spacing.lg,
-                    marginBottom: spacing.xl,
-                }}>
+                <EmailContainer>
                     <EmailHeader subheader={subheader} header={header} periodLabel={periodLabel} />
                     <SectionDivider />
 
@@ -108,7 +101,7 @@ export default function AnalyticsReportV1Email({
 
                     <SectionDivider />
                     <EmailFooter />
-                </Container>
+                </EmailContainer>
             </Body>
         </Html>
     );
