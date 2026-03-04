@@ -9,7 +9,7 @@ type EmailContainerProps = {
 export function EmailContainer({ children }: EmailContainerProps) {
     return (
         <Container style={{
-            maxWidth: '600px',
+            maxWidth: '800px',
             margin: '0 auto',
             backgroundColor: colors.surface,
             borderRadius: radii.card,
