@@ -50,9 +50,10 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   const attachments = request.attachments && request.attachments.length > 0
     ? request.attachments.map((a: EmailAttachment) => ({
         filename: a.filename,
-        content: a.content,
-        headers: a.headers,
-      }))
+        content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : a.content,
+        ...(a.content_id   ? { content_id:   a.content_id }   : {}),
+        ...(a.content_type ? { content_type: a.content_type } : {}),
+      })) as any
     : undefined;
 
   const { data, error } = await resend.emails.send({

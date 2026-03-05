@@ -92,10 +92,8 @@ export interface NotificationLogRow {
 export interface EmailAttachment {
   filename: string;
   content: Buffer | string;
-  headers?: {
-    'Content-ID': string;
-    'Content-Disposition'?: string;
-  };
+  content_id?: string;    // CID for inline images — no angle brackets, e.g. 'banner_image.png'
+  content_type?: string;  // MIME type, e.g. 'image/png'
 }
 
 export interface EmailRenderResult {

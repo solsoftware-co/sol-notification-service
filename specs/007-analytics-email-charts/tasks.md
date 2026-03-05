@@ -18,7 +18,7 @@
 
 **Purpose**: Confirm clean baseline before making changes. No new packages or infrastructure required for this feature.
 
-- [ ] T001 Verify baseline is green — run `npm run type-check && npm test` and confirm all pass before any changes
+- [X] T001 Verify baseline is green — run `npm run type-check && npm test` and confirm all pass before any changes
 
 ---
 
@@ -28,10 +28,10 @@
 
 **⚠️ CRITICAL**: All user story work is blocked until this phase is complete.
 
-- [ ] T002 Update `EmailAttachment` interface in `src/types/index.ts` — replace `headers?: { 'Content-ID': string }` with `content_id?: string` and add `content_type?: string`
-- [ ] T003 Update attachment mapping in `src/lib/email.ts` — replace `headers` passthrough with `content_id`/`content_type` spread; convert Buffer content to base64 string; add `as any` cast for resend@3.5.0 type gap
-- [ ] T004 Fix `loadBannerAttachment()` in `src/lib/templates.ts` — replace `headers: { 'Content-ID': '<banner_image.png>' }` with `content_id: 'banner_image.png'` and `content_type: 'image/png'`; convert buffer to base64 string (fixes banner inline embedding for both inquiry and analytics emails)
-- [ ] T005 Create `src/lib/charts.ts` with the three private primitives: `callQuickChart(chart, height)` (QuickChart HTTP transport), `generateAreaChart(labels, values, height?)` (branded line+fill Chart.js config), and `generateBarChart(labels, values, height?)` (branded horizontal bar Chart.js config) — no public exports yet; apply brand colours from `src/emails/styles.ts`
+- [X] T002 Update `EmailAttachment` interface in `src/types/index.ts` — replace `headers?: { 'Content-ID': string }` with `content_id?: string` and add `content_type?: string`
+- [X] T003 Update attachment mapping in `src/lib/email.ts` — replace `headers` passthrough with `content_id`/`content_type` spread; convert Buffer content to base64 string; add `as any` cast for resend@3.5.0 type gap
+- [X] T004 Fix `loadBannerAttachment()` in `src/lib/templates.ts` — replace `headers: { 'Content-ID': '<banner_image.png>' }` with `content_id: 'banner_image.png'` and `content_type: 'image/png'`; convert buffer to base64 string (fixes banner inline embedding for both inquiry and analytics emails)
+- [X] T005 Create `src/lib/charts.ts` with the three private primitives: `callQuickChart(chart, height)` (QuickChart HTTP transport), `generateAreaChart(labels, values, height?)` (branded line+fill Chart.js config), and `generateBarChart(labels, values, height?)` (branded horizontal bar Chart.js config) — no public exports yet; apply brand colours from `src/emails/styles.ts`
 
 **Checkpoint**: CID attachment bug fixed for all emails; chart building blocks in place. Run `npm run type-check` to confirm.
 
@@ -43,9 +43,9 @@
 
 **Independent Test**: Run `npm run email:preview`, open `.email-preview/analytics.html`, confirm a filled area chart appears immediately above the Daily Breakdown table with 7 data points matching the table values.
 
-- [ ] T006 [P] [US1] Add `generateDailyTrendChart(metrics: DailyMetric[])` public export to `src/lib/charts.ts` — map `metrics` to `labels` (date sliced to `MM-DD`) and `values` (sessions); delegate to `generateAreaChart`; throw on empty input
-- [ ] T007 [P] [US1] Update `AnalyticsEmailProps` in `src/emails/templates/analytics-report-v1.tsx` — remove old `charts: Array<...>` prop; add `dailyChart?: string`; in the `dailyMetrics` section render `<ChartCard image={dailyChart} title="Daily Sessions" description="Sessions per day" />` immediately above the `<DataTable>` when `dailyChart` is defined; remove the stale `{charts.map(...)}` render block at the bottom
-- [ ] T008 [US1] Wire daily chart in `src/lib/templates.ts` — in `renderAnalyticsReportEmail`: add `let dailyChartBuf: Buffer | null = null; try { dailyChartBuf = await generateDailyTrendChart(report.dailyMetrics); } catch (e) { /* log */ }`; append `{ filename: 'chart_daily.png', content: dailyChartBuf.toString('base64'), content_id: 'chart_daily', content_type: 'image/png' }` to attachments if non-null; pass `dailyChart: dailyChartBuf ? 'cid:chart_daily' : undefined` to template (depends on T006 + T007)
+- [X] T006 [P] [US1] Add `generateDailyTrendChart(metrics: DailyMetric[])` public export to `src/lib/charts.ts` — map `metrics` to `labels` (date sliced to `MM-DD`) and `values` (sessions); delegate to `generateAreaChart`; throw on empty input
+- [X] T007 [P] [US1] Update `AnalyticsEmailProps` in `src/emails/templates/analytics-report-v1.tsx` — remove old `charts: Array<...>` prop; add `dailyChart?: string`; in the `dailyMetrics` section render `<ChartCard image={dailyChart} title="Daily Sessions" description="Sessions per day" />` immediately above the `<DataTable>` when `dailyChart` is defined; remove the stale `{charts.map(...)}` render block at the bottom
+- [X] T008 [US1] Wire daily chart in `src/lib/templates.ts` — in `renderAnalyticsReportEmail`: add `let dailyChartBuf: Buffer | null = null; try { dailyChartBuf = await generateDailyTrendChart(report.dailyMetrics); } catch (e) { /* log */ }`; append `{ filename: 'chart_daily.png', content: dailyChartBuf.toString('base64'), content_id: 'chart_daily', content_type: 'image/png' }` to attachments if non-null; pass `dailyChart: dailyChartBuf ? 'cid:chart_daily' : undefined` to template (depends on T006 + T007)
 
 **Checkpoint**: Daily trend chart renders in preview; fallback to table-only works when `dailyChartBuf` is null.
 
@@ -57,9 +57,9 @@
 
 **Independent Test**: Run `npm run email:preview`, confirm a horizontal bar chart appears above the Top Sources table with one bar per source, lengths proportional to session counts.
 
-- [ ] T009 [P] [US2] Add `generateTopSourcesChart(sources: TrafficSource[])` public export to `src/lib/charts.ts` — map to `labels` (source name, truncated to 30 chars with `…`) and `values` (sessions); delegate to `generateBarChart`; throw on empty input
-- [ ] T010 [P] [US2] Add `sourcesChart?: string` prop to `AnalyticsEmailProps` in `src/emails/templates/analytics-report-v1.tsx`; in the `topSources` section render `<ChartCard image={sourcesChart} title="Top Sources" description="Sessions by acquisition channel" />` immediately above the `<DataTable>` when `sourcesChart` is defined
-- [ ] T011 [US2] Wire sources chart in `src/lib/templates.ts` — add independent try/catch for `generateTopSourcesChart`; append `chart_sources` attachment if non-null; pass `sourcesChart` CID ref to template (depends on T009 + T010)
+- [X] T009 [P] [US2] Add `generateTopSourcesChart(sources: TrafficSource[])` public export to `src/lib/charts.ts` — map to `labels` (source name, truncated to 30 chars with `…`) and `values` (sessions); delegate to `generateBarChart`; throw on empty input
+- [X] T010 [P] [US2] Add `sourcesChart?: string` prop to `AnalyticsEmailProps` in `src/emails/templates/analytics-report-v1.tsx`; in the `topSources` section render `<ChartCard image={sourcesChart} title="Top Sources" description="Sessions by acquisition channel" />` immediately above the `<DataTable>` when `sourcesChart` is defined
+- [X] T011 [US2] Wire sources chart in `src/lib/templates.ts` — add independent try/catch for `generateTopSourcesChart`; append `chart_sources` attachment if non-null; pass `sourcesChart` CID ref to template (depends on T009 + T010)
 
 **Checkpoint**: Sources bar chart renders in preview alongside Daily chart; each section degrades gracefully to table-only if its chart fails.
 
@@ -71,9 +71,9 @@
 
 **Independent Test**: Run `npm run email:preview`, confirm a horizontal bar chart appears above the Top Pages table with one bar per page path, bars proportional to view counts, long paths truncated.
 
-- [ ] T012 [P] [US3] Add `generateTopPagesChart(pages: TopPage[])` public export to `src/lib/charts.ts` — map to `labels` (path, truncated to 30 chars with `…`) and `values` (views); delegate to `generateBarChart`; throw on empty input
-- [ ] T013 [P] [US3] Add `pagesChart?: string` prop to `AnalyticsEmailProps` in `src/emails/templates/analytics-report-v1.tsx`; in the `topPages` section render `<ChartCard image={pagesChart} title="Top Pages" description="Page views by path" />` immediately above the `<DataTable>` when `pagesChart` is defined
-- [ ] T014 [US3] Wire pages chart in `src/lib/templates.ts` — add independent try/catch for `generateTopPagesChart`; append `chart_pages` attachment if non-null; pass `pagesChart` CID ref to template (depends on T012 + T013)
+- [X] T012 [P] [US3] Add `generateTopPagesChart(pages: TopPage[])` public export to `src/lib/charts.ts` — map to `labels` (path, truncated to 30 chars with `…`) and `values` (views); delegate to `generateBarChart`; throw on empty input
+- [X] T013 [P] [US3] Add `pagesChart?: string` prop to `AnalyticsEmailProps` in `src/emails/templates/analytics-report-v1.tsx`; in the `topPages` section render `<ChartCard image={pagesChart} title="Top Pages" description="Page views by path" />` immediately above the `<DataTable>` when `pagesChart` is defined
+- [X] T014 [US3] Wire pages chart in `src/lib/templates.ts` — add independent try/catch for `generateTopPagesChart`; append `chart_pages` attachment if non-null; pass `pagesChart` CID ref to template (depends on T012 + T013)
 
 **Checkpoint**: All three charts render in preview. Analytics email has banner + up to 3 chart attachments. Each chart independently falls back to table-only.
 
@@ -83,11 +83,11 @@
 
 **Purpose**: Preview script, tests, and final validation.
 
-- [ ] T015 Update `inlineImages()` in `scripts/test-email-preview.ts` — replace the hardcoded `replaceAll('cid:banner_image.png', ...)` with a dynamic loop over `rendered.attachments` that replaces each `cid:{att.content_id}` with `data:{att.content_type};base64,{b64}` for all attachments that have both `content_id` and `content_type`
-- [ ] T016 [P] Write `tests/unit/lib/charts.test.ts` — stub global `fetch` via `vi.stubGlobal`; verify: (1) `generateDailyTrendChart` sends `type: 'line'` config with correct labels/values, (2) `generateTopSourcesChart` sends `type: 'bar'` + `indexAxis: 'y'` config, (3) `generateTopPagesChart` truncates labels > 30 chars, (4) all three propagate errors from non-ok QuickChart response, (5) both `generateAreaChart` and `generateBarChart` pass `backgroundColor: colors.surface`
-- [ ] T017 [P] Update `tests/unit/lib/templates.test.ts` — add: (1) `renderAnalyticsReportEmail` with full data returns 4 attachments (banner + 3 charts), (2) returns 2 attachments when `topSources` is empty, (3) returns 3 attachments when one chart fn throws (mock `generateTopSourcesChart` to reject), (4) banner attachment has `content_id: 'banner_image.png'` and no `headers` field
-- [ ] T018 Run `npm run email:preview` — open `.email-preview/analytics.html` and visually confirm: area chart above daily table, two bar charts above their respective tables, all using brand colours, no broken images
-- [ ] T019 Run `npm run type-check && npm test` — confirm zero TypeScript errors and all tests pass
+- [X] T015 Update `inlineImages()` in `scripts/test-email-preview.ts` — replace the hardcoded `replaceAll('cid:banner_image.png', ...)` with a dynamic loop over `rendered.attachments` that replaces each `cid:{att.content_id}` with `data:{att.content_type};base64,{b64}` for all attachments that have both `content_id` and `content_type`
+- [X] T016 [P] Write `tests/unit/lib/charts.test.ts` — stub global `fetch` via `vi.stubGlobal`; verify: (1) `generateDailyTrendChart` sends `type: 'line'` config with correct labels/values, (2) `generateTopSourcesChart` sends `type: 'bar'` + `indexAxis: 'y'` config, (3) `generateTopPagesChart` truncates labels > 30 chars, (4) all three propagate errors from non-ok QuickChart response, (5) both `generateAreaChart` and `generateBarChart` pass `backgroundColor: colors.surface`
+- [X] T017 [P] Update `tests/unit/lib/templates.test.ts` — add: (1) `renderAnalyticsReportEmail` with full data returns 4 attachments (banner + 3 charts), (2) returns 2 attachments when `topSources` is empty, (3) returns 3 attachments when one chart fn throws (mock `generateTopSourcesChart` to reject), (4) banner attachment has `content_id: 'banner_image.png'` and no `headers` field
+- [X] T018 Run `npm run email:preview` — open `.email-preview/analytics.html` and visually confirm: area chart above daily table, two bar charts above their respective tables, all using brand colours, no broken images
+- [X] T019 Run `npm run type-check && npm test` — confirm zero TypeScript errors and all tests pass
 
 ---
 

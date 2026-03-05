@@ -1,16 +1,21 @@
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { exec } from 'node:child_process';
 import { join } from 'node:path';
 import { renderFormNotificationEmail, renderAnalyticsReportEmail } from '../src/lib/templates';
 import type { FormSubmittedPayload, ClientRow, AnalyticsReport, ResolvedPeriod } from '../src/types/index';
 
 const PREVIEW_DIR = join(process.cwd(), '.email-preview');
-const BANNER_PATH = join(process.cwd(), 'assets', 'banner_image.png');
 
 // Replace CID references with base64 data URIs so images render in browsers
-function inlineImages(html: string): string {
-  const bannerData = readFileSync(BANNER_PATH).toString('base64');
-  return html.replaceAll('cid:banner_image.png', `data:image/png;base64,${bannerData}`);
+function inlineImages(html: string, attachments: Array<{ content_id?: string; content_type?: string; content: Buffer | string }>): string {
+  let result = html;
+  for (const att of attachments) {
+    if (att.content_id && att.content_type) {
+      const b64 = Buffer.isBuffer(att.content) ? att.content.toString('base64') : att.content;
+      result = result.replaceAll(`cid:${att.content_id}`, `data:${att.content_type};base64,${b64}`);
+    }
+  }
+  return result;
 }
 
 function openInBrowser(filePath: string): void {
@@ -39,7 +44,7 @@ async function previewInquiry() {
 
   const rendered = await renderFormNotificationEmail(payload, mockClient);
   const filePath = join(PREVIEW_DIR, 'inquiry.html');
-  writeFileSync(filePath, inlineImages(rendered.html), 'utf-8');
+  writeFileSync(filePath, inlineImages(rendered.html, rendered.attachments), 'utf-8');
   openInBrowser(filePath);
   console.log('Inquiry preview written → .email-preview/inquiry.html');
 }
@@ -88,7 +93,7 @@ async function previewAnalytics() {
 
   const rendered = await renderAnalyticsReportEmail(report, mockClient, period);
   const filePath = join(PREVIEW_DIR, 'analytics.html');
-  writeFileSync(filePath, inlineImages(rendered.html), 'utf-8');
+  writeFileSync(filePath, inlineImages(rendered.html, rendered.attachments), 'utf-8');
   openInBrowser(filePath);
   console.log('Analytics preview written → .email-preview/analytics.html');
 }

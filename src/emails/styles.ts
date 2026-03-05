@@ -10,7 +10,8 @@ export const colors = {
   textPrimary:   '#36363B',  // headings, stat numbers, field values
   textSecondary: '#52525B',  // body text, descriptions, context lines
   textMuted:     '#A1A1AA',  // footer, field labels, metadata
-  accent:        '#5E96C7',  // links, CTA buttons, message-block left border
+  accent:        '#3A6EA5',  // links, CTA buttons, message-block left border
+  accentShading: 'rgba(94,150,199,0.15)',
   positive:      '#F7BC03',  // upward trend indicators
 } as const;
 

@@ -1,7 +1,10 @@
-// T028: templates module unit tests
+// T028 / T017: templates module unit tests
 
 const mockReadFile = vi.hoisted(() => vi.fn());
 const mockRender = vi.hoisted(() => vi.fn());
+const mockGenerateDailyTrendChart = vi.hoisted(() => vi.fn());
+const mockGenerateTopSourcesChart = vi.hoisted(() => vi.fn());
+const mockGenerateTopPagesChart = vi.hoisted(() => vi.fn());
 
 vi.mock('node:fs/promises', () => ({
   readFile: mockReadFile,
@@ -24,6 +27,12 @@ vi.mock('../../../src/lib/config', () => ({
   },
 }));
 
+vi.mock('../../../src/lib/charts', () => ({
+  generateDailyTrendChart: mockGenerateDailyTrendChart,
+  generateTopSourcesChart: mockGenerateTopSourcesChart,
+  generateTopPagesChart: mockGenerateTopPagesChart,
+}));
+
 import { renderFormNotificationEmail, renderAnalyticsReportEmail } from '../../../src/lib/templates';
 import type { FormSubmittedPayload, ClientRow, AnalyticsReport, ResolvedPeriod } from '../../../src/types/index';
 
@@ -32,6 +41,7 @@ import type { FormSubmittedPayload, ClientRow, AnalyticsReport, ResolvedPeriod }
 // ---------------------------------------------------------------------------
 
 const mockBannerBuffer = Buffer.from('fake-png-data');
+const mockChartBuffer = Buffer.from('fake-chart-png');
 const mockHtml = '<html><body>mock email content</body></html>';
 
 const mockClient: ClientRow = {
@@ -76,6 +86,9 @@ beforeEach(() => {
   vi.resetAllMocks();
   mockReadFile.mockResolvedValue(mockBannerBuffer);
   mockRender.mockResolvedValue(mockHtml);
+  mockGenerateDailyTrendChart.mockResolvedValue(mockChartBuffer);
+  mockGenerateTopSourcesChart.mockResolvedValue(mockChartBuffer);
+  mockGenerateTopPagesChart.mockResolvedValue(mockChartBuffer);
 });
 
 // ---------------------------------------------------------------------------
@@ -102,16 +115,22 @@ describe('renderFormNotificationEmail', () => {
     expect(result.html.length).toBeGreaterThan(0);
   });
 
-  it('returns one attachment with the banner filename and correct Content-ID header', async () => {
+  it('returns one attachment with the banner filename and content_id', async () => {
     const result = await renderFormNotificationEmail(payload, mockClient);
     expect(result.attachments).toHaveLength(1);
     expect(result.attachments[0].filename).toBe('banner_image.png');
-    expect(result.attachments[0].headers?.['Content-ID']).toBe('<banner_image.png>');
+    expect(result.attachments[0].content_id).toBe('banner_image.png');
   });
 
-  it('includes the banner buffer content in the attachment', async () => {
+  it('banner attachment has no headers field', async () => {
     const result = await renderFormNotificationEmail(payload, mockClient);
-    expect(result.attachments[0].content).toBe(mockBannerBuffer);
+    expect((result.attachments[0] as any).headers).toBeUndefined();
+  });
+
+  it('banner attachment content is a base64 string', async () => {
+    const result = await renderFormNotificationEmail(payload, mockClient);
+    const expectedBase64 = mockBannerBuffer.toString('base64');
+    expect(result.attachments[0].content).toBe(expectedBase64);
   });
 
   it('reads the banner from assets/banner_image.png', async () => {
@@ -154,10 +173,54 @@ describe('renderAnalyticsReportEmail', () => {
     expect(result.html.length).toBeGreaterThan(0);
   });
 
-  it('returns one attachment with the banner filename', async () => {
+  it('returns 4 attachments (banner + 3 charts) when all chart data is present', async () => {
     const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
-    expect(result.attachments).toHaveLength(1);
-    expect(result.attachments[0].filename).toBe('banner_image.png');
+    expect(result.attachments).toHaveLength(4);
+    const filenames = result.attachments.map(a => a.filename);
+    expect(filenames).toContain('banner_image.png');
+    expect(filenames).toContain('chart_daily.png');
+    expect(filenames).toContain('chart_sources.png');
+    expect(filenames).toContain('chart_pages.png');
+  });
+
+  it('omits sources chart when topSources is empty (graceful fallback)', async () => {
+    // Real implementation throws for empty array — replicate that in the mock
+    mockGenerateTopSourcesChart.mockRejectedValue(new Error('sources array is empty'));
+    const reportNoSources: AnalyticsReport = { ...mockReport, topSources: [] };
+    const result = await renderAnalyticsReportEmail(reportNoSources, mockClient, mockPeriod);
+    const filenames = result.attachments.map(a => a.filename);
+    expect(filenames).not.toContain('chart_sources.png');
+    expect(filenames).toContain('banner_image.png');
+    expect(filenames).toContain('chart_daily.png');
+    expect(filenames).toContain('chart_pages.png');
+  });
+
+  it('returns 3 attachments when one chart fn throws', async () => {
+    mockGenerateTopSourcesChart.mockRejectedValue(new Error('QuickChart 500'));
+    const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
+    expect(result.attachments).toHaveLength(3);
+    const filenames = result.attachments.map(a => a.filename);
+    expect(filenames).not.toContain('chart_sources.png');
+    expect(filenames).toContain('banner_image.png');
+    expect(filenames).toContain('chart_daily.png');
+    expect(filenames).toContain('chart_pages.png');
+  });
+
+  it('banner attachment has content_id and no headers field', async () => {
+    const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
+    const banner = result.attachments.find(a => a.filename === 'banner_image.png')!;
+    expect(banner.content_id).toBe('banner_image.png');
+    expect((banner as any).headers).toBeUndefined();
+  });
+
+  it('chart attachments have correct content_id values', async () => {
+    const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
+    const daily = result.attachments.find(a => a.filename === 'chart_daily.png')!;
+    const sources = result.attachments.find(a => a.filename === 'chart_sources.png')!;
+    const pages = result.attachments.find(a => a.filename === 'chart_pages.png')!;
+    expect(daily.content_id).toBe('chart_daily');
+    expect(sources.content_id).toBe('chart_sources');
+    expect(pages.content_id).toBe('chart_pages');
   });
 
   it('returns a previewText containing the session count', async () => {
