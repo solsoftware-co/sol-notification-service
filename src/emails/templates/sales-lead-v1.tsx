@@ -65,7 +65,7 @@ export default function SalesLeadV1Email({
                     <FieldGroup fields={fields} />
 
                     {comments && <SectionDivider />}
-                    {comments && <MessageBlock message={comments} />}
+                    {comments && <MessageBlock title="Comments" message={comments} />}
 
                     {hasMetadata && <SectionDivider />}
                     {hasMetadata && (
