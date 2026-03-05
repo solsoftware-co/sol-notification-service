@@ -52,7 +52,7 @@ function buildPreviewPage({ to, subject, html, attachments = [] }: PreviewOption
       font-weight: 700; font-size: 11px; letter-spacing: 0.05em;
       padding: 3px 8px; border-radius: 4px; text-transform: uppercase;
     }
-    .email-body { max-width: 680px; margin: 32px auto; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.1); }
+    .email-body { margin: 32px 10px; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.1); }
     .email-content { padding: 32px; }
   </style>
 </head>
