@@ -165,11 +165,11 @@ export async function renderAnalyticsReportEmail(
       avgDuration,
       activeUsers,
       newUsers,
-      topSources: report.topSources.slice(0, 7).map((s) => ({
+      topSources: report.topSources.map((s) => ({
         source: s.source,
         sessions: s.sessions.toLocaleString(),
       })),
-      topPages: report.topPages.slice(0, 7).map((p) => ({
+      topPages: report.topPages.map((p) => ({
         path: p.path,
         views: p.views.toLocaleString(),
       })),

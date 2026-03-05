@@ -4,10 +4,26 @@ import { log } from "../utils/logger";
 import type {
   AnalyticsReport,
   ResolvedPeriod,
+  ReportPeriodPreset,
   TopPage,
   TrafficSource,
   DailyMetric,
 } from "../types/index";
+
+// Default row limits per reporting preset.
+// Weekly = quick snapshot; monthly/longer = comprehensive view.
+const PRESET_LIMITS: Record<ReportPeriodPreset, { sources: number; pages: number }> = {
+  last_week:    { sources: 5,  pages: 5  },
+  last_month:   { sources: 10, pages: 20 },
+  last_30_days: { sources: 10, pages: 20 },
+  last_90_days: { sources: 10, pages: 20 },
+  custom:       { sources: 10, pages: 10 },
+};
+
+export interface AnalyticsReportOptions {
+  topSourcesLimit?: number;
+  topPagesLimit?: number;
+}
 
 type IRunReportResponse =
   protos.google.analytics.data.v1beta.IRunReportResponse;
@@ -154,20 +170,24 @@ function mockReport(period: ResolvedPeriod): AnalyticsReport {
 
 export async function getAnalyticsReport(
   propertyId: string,
-  period: ResolvedPeriod
+  period: ResolvedPeriod,
+  options: AnalyticsReportOptions = {}
 ): Promise<AnalyticsReport> {
   if (!config.ga4CredentialsJson) {
     log("[analytics] GA4_SERVICE_ACCOUNT_JSON not set — returning mock data");
     return mockReport(period);
   }
 
+  const defaults = PRESET_LIMITS[period.preset];
+  const sourcesLimit = options.topSourcesLimit ?? defaults.sources;
+  const pagesLimit = options.topPagesLimit ?? defaults.pages;
   const { start, end } = period;
 
   const [dailyData, durationData, sourcesData, pagesData] = await Promise.all([
     getReportData(propertyId, start, end),
     getAverageSessionDuration(propertyId, start, end),
-    getTrafficSourceData(propertyId, start, end, 5),
-    getMostViewedPagesData(propertyId, start, end, 5),
+    getTrafficSourceData(propertyId, start, end, sourcesLimit),
+    getMostViewedPagesData(propertyId, start, end, pagesLimit),
   ]);
 
   // Aggregate sessions/users/newUsers from daily rows

@@ -132,7 +132,10 @@ export const sendAnalyticsReport = inngest.createFunction(
     } as any);
 
     const report = await step.run("fetch-analytics-data", async () => {
-      return getAnalyticsReport(client.ga4_property_id!, resolvedPeriod);
+      return getAnalyticsReport(client.ga4_property_id!, resolvedPeriod, {
+        topSourcesLimit: data.topSourcesLimit,
+        topPagesLimit: data.topPagesLimit,
+      });
     });
 
     const result = await step.run("send-email", async () => {

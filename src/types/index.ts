@@ -68,7 +68,9 @@ export interface AnalyticsReport {
 export interface AnalyticsReportRequestedPayload extends BaseEventPayload {
   // clientId inherited from BaseEventPayload
   reportPeriod: ReportPeriod;
-  scheduledAt: string; // ISO 8601 timestamp — used for preset resolution
+  scheduledAt: string;    // ISO 8601 timestamp — used for preset resolution
+  topSourcesLimit?: number; // overrides per-preset default (last_week=5, others=10)
+  topPagesLimit?: number;   // overrides per-preset default (last_week=5, last_month=20, others=20)
 }
 
 export interface ClientRow {
