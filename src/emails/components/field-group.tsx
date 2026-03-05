@@ -1,5 +1,6 @@
 import { Row, Column, Text, Link } from '@react-email/components';
 import { colors, typography, spacing } from '../styles';
+import { LabelText } from './label-text';
 
 type Field = {
     label: string;
@@ -14,18 +15,7 @@ type FieldGroupProps = {
 function FieldCell({ label, value, href }: Field) {
     return (
         <div style={{ paddingBottom: spacing.md }}>
-            <Text style={{
-                fontFamily: typography.fontStack,
-                fontSize: typography.sizes.label,
-                fontWeight: typography.weights.medium,
-                color: colors.textMuted,
-                letterSpacing: typography.letterSpacing.label,
-                textTransform: 'uppercase',
-                margin: '0 0 2px 0',
-                lineHeight: typography.lineHeights.small,
-            }}>
-                {label}
-            </Text>
+            <LabelText style={{ margin: '0 0 2px 0' }}>{label}</LabelText>
             {href ? (
                 <Link href={href} style={{
                     fontFamily: typography.fontStack,
