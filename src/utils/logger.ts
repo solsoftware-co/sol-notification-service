@@ -1,3 +1,4 @@
+import pino from "pino";
 import { config } from "../lib/config";
 
 interface LogContext {
@@ -5,23 +6,26 @@ interface LogContext {
   [key: string]: unknown;
 }
 
-function formatPrefix(context?: LogContext): string {
-  const envTag = `[${config.env}]`;
-  const clientTag =
-    context?.clientId ? ` [clientId=${context.clientId}]` : "";
-  return `${envTag}${clientTag}`;
-}
+const isDev = config.env === "development";
 
-function formatContext(context?: LogContext): string {
-  if (!context) return "";
-  const { clientId: _clientId, ...rest } = context;
-  const keys = Object.keys(rest);
-  if (keys.length === 0) return "";
-  return " " + JSON.stringify(rest);
-}
+const pinoLogger = pino({
+  level: "info",
+  base: { service: "sol-notification-service" },
+  timestamp: pino.stdTimeFunctions.isoTime,
+  formatters: {
+    bindings: (bindings) => ({ ...bindings, env: config.env }),
+  },
+  transport: {
+    targets: isDev
+      ? [{ target: "pino-pretty", level: "debug", options: { colorize: true } }]
+      : config.logtailToken
+        ? [{ target: "@logtail/pino", level: "info", options: { sourceToken: config.logtailToken } }]
+        : [{ target: "pino/file", level: "info", options: { destination: 1 } }],
+  },
+});
 
 export function log(message: string, context?: LogContext): void {
-  console.log(`${formatPrefix(context)} ${message}${formatContext(context)}`);
+  pinoLogger.info({ ...context }, message);
 }
 
 export function logError(
@@ -29,9 +33,9 @@ export function logError(
   error: unknown,
   context?: LogContext
 ): void {
-  const errorMessage =
-    error instanceof Error ? error.message : String(error);
-  console.error(
-    `${formatPrefix(context)} ERROR: ${message} — ${errorMessage}${formatContext(context)}`
-  );
+  pinoLogger.error({ ...(context ?? {}), err: error }, message);
+}
+
+export function flush(): void {
+  pinoLogger.flush();
 }

@@ -4,9 +4,11 @@ import { inngest } from "./inngest/client";
 import { functions } from "./inngest/functions/index";
 import { config } from "./lib/config";
 import { checkDbConnection } from "./lib/db";
-import { log } from "./utils/logger";
+import { log, flush } from "./utils/logger";
 
 const handler = serve({ client: inngest, functions });
+
+process.on("SIGTERM", () => flush());
 
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
 

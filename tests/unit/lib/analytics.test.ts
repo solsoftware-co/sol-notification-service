@@ -33,6 +33,7 @@ vi.mock("../../../src/lib/config", () => ({
 vi.mock("../../../src/utils/logger", () => ({
   log: vi.fn(),
   logError: vi.fn(),
+  flush: vi.fn(),
 }));
 
 import { getAnalyticsReport } from "../../../src/lib/analytics";

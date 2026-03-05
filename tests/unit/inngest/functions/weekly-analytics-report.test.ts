@@ -37,6 +37,7 @@ vi.mock("../../../../src/lib/templates", () => ({
 vi.mock("../../../../src/utils/logger", () => ({
   log: vi.fn(),
   logError: vi.fn(),
+  flush: vi.fn(),
 }));
 
 import { InngestTestEngine, mockCtx } from "@inngest/test";

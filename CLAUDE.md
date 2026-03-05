@@ -9,6 +9,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - TypeScript 5.x / Node.js 20+ + `@react-email/components` (new), `@react-email/render` (new), `react ^18` (new), existing: `inngest ^3`, `resend ^3`, `@neondatabase/serverless ^1` (006-email-templates)
 - Neon PostgreSQL — no schema changes (006-email-templates)
 - TypeScript 5.x / Node.js 20+ + `@resvg/resvg-js ^2.6.2` (new — SVG→PNG), existing: `@react-email/render`, `resend ^3.x`, `inngest ^3.x` (007-analytics-email-charts)
+- TypeScript 5.x / Node.js 20+ + `pino` (logger), `@logtail/pino` (Better Stack transport), `pino-pretty` (dev terminal output, devDep only) (008-structured-logging)
+- N/A — no database schema changes (008-structured-logging)
 
 ## Project Structure
 
@@ -23,7 +25,7 @@ src/
 │   ├── analytics.ts                # GA4 Data API wrapper — getAnalyticsReport(), mock/live routing
 │   └── email.ts                    # Email abstraction (mock/test/live routing)
 ├── utils/
-│   ├── logger.ts                   # Structured logger ([env] [clientId=...] prefix)
+│   ├── logger.ts                   # Pino logger — exports log(), logError(), flush(). Never import pino directly.
 │   └── email-preview.ts            # Mock mode: writes HTML to .email-preview/last.html
 └── inngest/
     ├── client.ts                   # Inngest client (id: "notification-service")
@@ -67,9 +69,9 @@ npm run email:preview  # Send a mock email and open the HTML preview in the brow
 - See `.specify/memory/constitution.md` for full architectural rules
 
 ## Recent Changes
+- 008-structured-logging: Replaced console.log logger with `pino` + Better Stack (`@logtail/pino`). `src/utils/logger.ts` exports `log()`, `logError()`, `flush()`. Dev: pino-pretty (colorized stdout). Non-dev+token: Better Stack. Non-dev+no token: stdout JSON fallback. `LOGTAIL_SOURCE_TOKEN` via `config.logtailToken`. Never import pino directly.
 - 007-analytics-email-charts: Added TypeScript 5.x / Node.js 20+ + `@resvg/resvg-js ^2.6.2` (new — SVG→PNG), existing: `@react-email/render`, `resend ^3.x`, `inngest ^3.x`
 - 006-email-templates: Added TypeScript 5.x / Node.js 20+ + `@react-email/components` (new), `@react-email/render` (new), `react ^18` (new), existing: `inngest ^3`, `resend ^3`, `@neondatabase/serverless ^1`
-- 005-weekly-analytics-report: Added `@google-analytics/data ^4.x`; new functions `weekly-analytics-scheduler` + `weekly-analytics-report`; `GA4_SERVICE_ACCOUNT_JSON` env var; `getAllActiveClients()` in db.ts; `getAnalyticsReport()` in analytics.ts
 
 
 <!-- MANUAL ADDITIONS START -->

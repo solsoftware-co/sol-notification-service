@@ -9,6 +9,7 @@ export interface AppConfig {
   resendFrom: string;
   databaseUrl: string;
   ga4CredentialsJson: string | null;
+  logtailToken: string | null;
 }
 
 // ---------------------------------------------------------------------------

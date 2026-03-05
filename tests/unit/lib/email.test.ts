@@ -18,7 +18,7 @@ vi.mock("resend", () => ({
 }));
 
 vi.mock("../../../src/lib/config", () => ({ config: mockConfig }));
-vi.mock("../../../src/utils/logger", () => ({ log: vi.fn(), logError: vi.fn() }));
+vi.mock("../../../src/utils/logger", () => ({ log: vi.fn(), logError: vi.fn(), flush: vi.fn() }));
 vi.mock("../../../src/utils/email-preview", () => ({
   writeEmailPreview: vi.fn(),
 }));
