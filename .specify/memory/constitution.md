@@ -164,6 +164,10 @@ constitution amendment (MINOR bump minimum; MAJOR if a core service is replaced)
 | Analytics | Google Analytics 4 (@google-analytics/data) | ^4.x |
 | Local dev tooling | tsx | ^4.x |
 | Email rendering | React + React Email | react ^18, @react-email/components ^0.0.x, @react-email/render ^1.x |
+| Logging | pino | ^9.x |
+| Logging (dev pretty-print) | pino-pretty | devDep |
+| Log transport | @logtail/pino | ^3.x |
+| Log management | Better Stack | Free plan |
 
 **Explicitly out-of-scope for PoC:** SMS (Twilio), Slack, push notifications (Firebase),
 client self-service UI, advanced analytics, load testing infrastructure.
@@ -219,6 +223,7 @@ A workflow is NOT considered complete until all of the following pass:
 - Client data MUST be isolated per tenant; cross-tenant data access is prohibited
 - Email addresses MUST be validated (non-empty, contains `@`) before any send call
 - `DATABASE_URL` and `RESEND_API_KEY` MUST use separate values per environment
+- `LOGTAIL_SOURCE_TOKEN` MUST be set for Production and Preview; absent in Development (logger falls back to stdout JSON)
 
 ## Governance
 
@@ -245,4 +250,4 @@ gates in `plan-template.md` before merge. Violations of Principle VI (unapproved
 infrastructure) MUST be justified in the plan's Complexity Tracking table with explicit
 rationale for why no simpler approach exists.
 
-**Version**: 1.0.0 | **Ratified**: 2026-02-13 | **Last Amended**: 2026-02-23
+**Version**: 1.1.0 | **Ratified**: 2026-02-13 | **Last Amended**: 2026-03-05

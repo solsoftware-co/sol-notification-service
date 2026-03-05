@@ -1,4 +1,4 @@
-// T014 + T015 + T019 + T029: weekly-analytics-report unit tests
+// T014 + T015 + T019 + T029: analytics-report unit tests
 
 const mockGetClientById = vi.hoisted(() => vi.fn());
 const mockGetAnalyticsReport = vi.hoisted(() => vi.fn());
@@ -37,10 +37,11 @@ vi.mock("../../../../src/lib/templates", () => ({
 vi.mock("../../../../src/utils/logger", () => ({
   log: vi.fn(),
   logError: vi.fn(),
+  flush: vi.fn(),
 }));
 
 import { InngestTestEngine, mockCtx } from "@inngest/test";
-import { sendWeeklyAnalyticsReport } from "../../../../src/inngest/functions/weekly-analytics-report";
+import { sendAnalyticsReport } from "../../../../src/inngest/functions/analytics-report";
 import type {
   ClientRow,
   AnalyticsReport,
@@ -106,7 +107,7 @@ const baseEvent = {
 // ---------------------------------------------------------------------------
 
 const t = new InngestTestEngine({
-  function: sendWeeklyAnalyticsReport,
+  function: sendAnalyticsReport,
   events: [baseEvent],
   transformCtx: (ctx: any) => mockCtx(ctx),
 });

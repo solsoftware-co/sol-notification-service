@@ -96,9 +96,9 @@ function resolvePeriod(period: ReportPeriod, scheduledAt: string): ResolvedPerio
 // Inngest function
 // ---------------------------------------------------------------------------
 
-export const sendWeeklyAnalyticsReport = inngest.createFunction(
+export const sendAnalyticsReport = inngest.createFunction(
   {
-    id: "send-weekly-analytics-report",
+    id: "send-analytics-report",
     retries: 3,
   },
   { event: "analytics/report.requested" },
@@ -132,7 +132,10 @@ export const sendWeeklyAnalyticsReport = inngest.createFunction(
     } as any);
 
     const report = await step.run("fetch-analytics-data", async () => {
-      return getAnalyticsReport(client.ga4_property_id!, resolvedPeriod);
+      return getAnalyticsReport(client.ga4_property_id!, resolvedPeriod, {
+        topSourcesLimit: data.topSourcesLimit,
+        topPagesLimit: data.topPagesLimit,
+      });
     });
 
     const result = await step.run("send-email", async () => {

@@ -5,6 +5,7 @@ const mockRender = vi.hoisted(() => vi.fn());
 const mockGenerateDailyTrendChart = vi.hoisted(() => vi.fn());
 const mockGenerateTopSourcesChart = vi.hoisted(() => vi.fn());
 const mockGenerateTopPagesChart = vi.hoisted(() => vi.fn());
+const mockAnalyticsReportEmailFn = vi.hoisted(() => vi.fn());
 
 vi.mock('node:fs/promises', () => ({
   readFile: mockReadFile,
@@ -31,6 +32,10 @@ vi.mock('../../../src/lib/charts', () => ({
   generateDailyTrendChart: mockGenerateDailyTrendChart,
   generateTopSourcesChart: mockGenerateTopSourcesChart,
   generateTopPagesChart: mockGenerateTopPagesChart,
+}));
+
+vi.mock('../../../src/emails/templates/analytics-report-v1', () => ({
+  default: mockAnalyticsReportEmailFn,
 }));
 
 import { renderFormNotificationEmail, renderAnalyticsReportEmail } from '../../../src/lib/templates';
@@ -89,6 +94,7 @@ beforeEach(() => {
   mockGenerateDailyTrendChart.mockResolvedValue(mockChartBuffer);
   mockGenerateTopSourcesChart.mockResolvedValue(mockChartBuffer);
   mockGenerateTopPagesChart.mockResolvedValue(mockChartBuffer);
+  mockAnalyticsReportEmailFn.mockReturnValue({ type: 'div', props: {} });
 });
 
 // ---------------------------------------------------------------------------
@@ -241,5 +247,19 @@ describe('renderAnalyticsReportEmail', () => {
     const [element] = mockRender.mock.calls[0];
     expect(element).toBeDefined();
     expect(element.type).toBeDefined();
+  });
+
+  it('formats ISO date (YYYY-MM-DD) to MM/DD/YYYY in dailyMetrics passed to template', async () => {
+    const report = { ...mockReport, dailyMetrics: [{ date: '2026-02-16', sessions: 100, activeUsers: 80, newUsers: 20 }] };
+    await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+    const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+    expect(props.dailyMetrics[0].date).toBe('02/16/2026');
+  });
+
+  it('formats GA4 compact date (YYYYMMDD) to MM/DD/YYYY in dailyMetrics passed to template', async () => {
+    const report = { ...mockReport, dailyMetrics: [{ date: '20260201', sessions: 100, activeUsers: 80, newUsers: 20 }] };
+    await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+    const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+    expect(props.dailyMetrics[0].date).toBe('02/01/2026');
   });
 });

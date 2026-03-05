@@ -56,7 +56,9 @@ function buildConfig(): AppConfig {
     );
   }
 
-  return { env, emailMode, testEmail, resendApiKey, resendFrom, databaseUrl, ga4CredentialsJson };
+  const logtailToken = process.env.LOGTAIL_SOURCE_TOKEN ?? null;
+
+  return { env, emailMode, testEmail, resendApiKey, resendFrom, databaseUrl, ga4CredentialsJson, logtailToken };
 }
 
 export const config: AppConfig = buildConfig();

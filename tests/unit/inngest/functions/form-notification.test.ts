@@ -32,6 +32,7 @@ vi.mock("../../../../src/lib/templates", () => ({
 vi.mock("../../../../src/utils/logger", () => ({
   log: vi.fn(),
   logError: vi.fn(),
+  flush: vi.fn(),
 }));
 
 // Imports after mocks

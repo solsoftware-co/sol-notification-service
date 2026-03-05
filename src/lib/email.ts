@@ -29,7 +29,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
 
   if (mode === "mock") {
     log(`[mock] Would send to: ${request.to} | Subject: ${request.subject} | Body length: ${request.html.length} chars`);
-    writeEmailPreview({ to: request.to, subject: request.subject, html: request.html });
+    writeEmailPreview({ to: request.to, subject: request.subject, html: request.html, attachments: request.attachments });
     return {
       mode,
       originalTo: request.to,

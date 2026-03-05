@@ -131,8 +131,10 @@ async function generateBarChart(
 export async function generateDailyTrendChart(metrics: DailyMetric[]): Promise<Buffer> {
   if (metrics.length === 0) throw new Error('generateDailyTrendChart: metrics array is empty');
   const labels = metrics.map((m) => {
-    const [, mm, dd] = m.date.split('-');
-    return `${parseInt(mm)}/${parseInt(dd)}`; // "YYYY-MM-DD" → "M/D"
+    // GA4 returns "YYYYMMDD"; ISO format is "YYYY-MM-DD" — handle both
+    const s = m.date.includes('-') ? m.date : `${m.date.slice(0, 4)}-${m.date.slice(4, 6)}-${m.date.slice(6, 8)}`;
+    const [, mm, dd] = s.split('-');
+    return `${parseInt(mm)}/${parseInt(dd)}`; // → "M/D"
   });
   const values = metrics.map((m) => m.sessions);
   return generateAreaChart(labels, values);

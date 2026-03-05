@@ -33,6 +33,7 @@ vi.mock("../../../src/lib/config", () => ({
 vi.mock("../../../src/utils/logger", () => ({
   log: vi.fn(),
   logError: vi.fn(),
+  flush: vi.fn(),
 }));
 
 import { getAnalyticsReport } from "../../../src/lib/analytics";
@@ -150,6 +151,75 @@ describe("getAnalyticsReport", () => {
     expect(report.topSources).toEqual([]);
     expect(report.dailyMetrics).toEqual([]);
     expect(report.isMock).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // Per-preset default limits
+  it("last_week preset — uses 5 sources and 5 pages by default", async () => {
+    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
+    const emptyResponse = { rows: [] };
+    mockRunReport.mockResolvedValue([emptyResponse]);
+
+    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_week" });
+
+    const sourcesCall = mockRunReport.mock.calls[2][0];
+    const pagesCall   = mockRunReport.mock.calls[3][0];
+    expect(sourcesCall.limit).toBe(5);
+    expect(pagesCall.limit).toBe(5);
+  });
+
+  it("last_month preset — uses 10 sources and 20 pages by default", async () => {
+    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
+    const emptyResponse = { rows: [] };
+    mockRunReport.mockResolvedValue([emptyResponse]);
+
+    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_month" });
+
+    const sourcesCall = mockRunReport.mock.calls[2][0];
+    const pagesCall   = mockRunReport.mock.calls[3][0];
+    expect(sourcesCall.limit).toBe(10);
+    expect(pagesCall.limit).toBe(20);
+  });
+
+  it("last_30_days preset — uses 10 sources and 20 pages by default", async () => {
+    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
+    const emptyResponse = { rows: [] };
+    mockRunReport.mockResolvedValue([emptyResponse]);
+
+    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_30_days" });
+
+    const sourcesCall = mockRunReport.mock.calls[2][0];
+    const pagesCall   = mockRunReport.mock.calls[3][0];
+    expect(sourcesCall.limit).toBe(10);
+    expect(pagesCall.limit).toBe(20);
+  });
+
+  // -------------------------------------------------------------------------
+  // Custom limit overrides
+  it("custom topSourcesLimit overrides the preset default", async () => {
+    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
+    const emptyResponse = { rows: [] };
+    mockRunReport.mockResolvedValue([emptyResponse]);
+
+    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_week" }, { topSourcesLimit: 15 });
+
+    const sourcesCall = mockRunReport.mock.calls[2][0];
+    const pagesCall   = mockRunReport.mock.calls[3][0];
+    expect(sourcesCall.limit).toBe(15); // overridden
+    expect(pagesCall.limit).toBe(5);    // still using preset default
+  });
+
+  it("custom topPagesLimit overrides the preset default", async () => {
+    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
+    const emptyResponse = { rows: [] };
+    mockRunReport.mockResolvedValue([emptyResponse]);
+
+    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_month" }, { topPagesLimit: 3 });
+
+    const sourcesCall = mockRunReport.mock.calls[2][0];
+    const pagesCall   = mockRunReport.mock.calls[3][0];
+    expect(sourcesCall.limit).toBe(10); // still using preset default
+    expect(pagesCall.limit).toBe(3);    // overridden
   });
 
   // -------------------------------------------------------------------------
