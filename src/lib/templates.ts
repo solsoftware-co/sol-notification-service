@@ -3,6 +3,12 @@ import path from 'node:path';
 import { render } from '@react-email/render';
 import SalesLeadV1Email from '../emails/templates/sales-lead-v1';
 import AnalyticsReportV1Email from '../emails/templates/analytics-report-v1';
+import {
+  generateDailyTrendChart,
+  generateTopSourcesChart,
+  generateTopPagesChart,
+} from './charts';
+import { log } from '../utils/logger';
 import type {
   FormSubmittedPayload,
   ClientRow,
@@ -17,8 +23,9 @@ async function loadBannerAttachment(): Promise<EmailAttachment> {
   const content = await readFile(path.join(process.cwd(), 'assets', 'banner_image.png'));
   return {
     filename: 'banner_image.png',
-    content,
-    headers: { 'Content-ID': '<banner_image.png>' },
+    content: content.toString('base64'),
+    content_id: 'banner_image.png',
+    content_type: 'image/png',
   };
 }
 
@@ -93,6 +100,54 @@ export async function renderAnalyticsReportEmail(
     description: `New users — ${period.label}`,
   };
 
+  // Generate charts independently — each fails gracefully without blocking the others
+  let dailyChartBuf: Buffer | null = null;
+  try {
+    dailyChartBuf = await generateDailyTrendChart(report.dailyMetrics);
+  } catch (e) {
+    log(`[charts] daily trend chart failed: ${e}`);
+  }
+
+  let sourcesChartBuf: Buffer | null = null;
+  try {
+    sourcesChartBuf = await generateTopSourcesChart(report.topSources);
+  } catch (e) {
+    log(`[charts] top sources chart failed: ${e}`);
+  }
+
+  let pagesChartBuf: Buffer | null = null;
+  try {
+    pagesChartBuf = await generateTopPagesChart(report.topPages);
+  } catch (e) {
+    log(`[charts] top pages chart failed: ${e}`);
+  }
+
+  const attachments: EmailAttachment[] = [banner];
+  if (dailyChartBuf) {
+    attachments.push({
+      filename: 'chart_daily.png',
+      content: dailyChartBuf.toString('base64'),
+      content_id: 'chart_daily',
+      content_type: 'image/png',
+    });
+  }
+  if (sourcesChartBuf) {
+    attachments.push({
+      filename: 'chart_sources.png',
+      content: sourcesChartBuf.toString('base64'),
+      content_id: 'chart_sources',
+      content_type: 'image/png',
+    });
+  }
+  if (pagesChartBuf) {
+    attachments.push({
+      filename: 'chart_pages.png',
+      content: pagesChartBuf.toString('base64'),
+      content_id: 'chart_pages',
+      content_type: 'image/png',
+    });
+  }
+
   const html = await render(
     AnalyticsReportV1Email({
       previewText,
@@ -117,9 +172,11 @@ export async function renderAnalyticsReportEmail(
         activeUsers: d.activeUsers.toLocaleString(),
         newUsers: d.newUsers.toLocaleString(),
       })),
-      charts: [],
+      dailyChart: dailyChartBuf ? 'cid:chart_daily' : undefined,
+      sourcesChart: sourcesChartBuf ? 'cid:chart_sources' : undefined,
+      pagesChart: pagesChartBuf ? 'cid:chart_pages' : undefined,
     }),
   );
 
-  return { subject, html, previewText, attachments: [banner] };
+  return { subject, html, previewText, attachments };
 }

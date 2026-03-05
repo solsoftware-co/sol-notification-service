@@ -24,7 +24,9 @@ export type AnalyticsEmailProps = {
     topSources: Array<{ source: string; sessions: string }>;
     topPages: Array<{ path: string; views: string }>;
     dailyMetrics: Array<{ date: string; sessions: string; activeUsers: string; newUsers: string }>;
-    charts: Array<{ title: string; description: string; image: string }>;
+    dailyChart?: string;
+    sourcesChart?: string;
+    pagesChart?: string;
 };
 
 export default function AnalyticsReportV1Email({
@@ -39,7 +41,9 @@ export default function AnalyticsReportV1Email({
     topSources = [],
     topPages = [],
     dailyMetrics = [],
-    charts = [],
+    dailyChart,
+    sourcesChart,
+    pagesChart,
 }: AnalyticsEmailProps) {
     return (
         <Html>
@@ -60,8 +64,14 @@ export default function AnalyticsReportV1Email({
                     {topSources.length > 0 && (
                         <>
                             <SectionDivider />
+                            {sourcesChart && (
+                                <ChartCard
+                                    image={sourcesChart}
+                                    title="Top Sources"
+                                    description="Sessions by acquisition channel"
+                                />
+                            )}
                             <DataTable
-                                title="Top Sources"
                                 columns={['Source', 'Sessions']}
                                 rows={topSources.map(s => [s.source, s.sessions])}
                             />
@@ -71,8 +81,14 @@ export default function AnalyticsReportV1Email({
                     {topPages.length > 0 && (
                         <>
                             <SectionDivider />
+                            {pagesChart && (
+                                <ChartCard
+                                    image={pagesChart}
+                                    title="Top Pages"
+                                    description="Page views by path"
+                                />
+                            )}
                             <DataTable
-                                title="Top Pages"
                                 columns={['Page', 'Views']}
                                 rows={topPages.map(p => [p.path, p.views])}
                             />
@@ -82,6 +98,13 @@ export default function AnalyticsReportV1Email({
                     {dailyMetrics.length > 0 && (
                         <>
                             <SectionDivider />
+                            {dailyChart && (
+                                <ChartCard
+                                    image={dailyChart}
+                                    title="Daily Sessions"
+                                    description="Sessions per day"
+                                />
+                            )}
                             <DataTable
                                 title="Daily Breakdown"
                                 columns={['Date', 'Sessions', 'Active Users', 'New Users']}
@@ -89,15 +112,6 @@ export default function AnalyticsReportV1Email({
                             />
                         </>
                     )}
-
-                    {charts.map((chart, i) => (
-                        <ChartCard
-                            key={i}
-                            title={chart.title}
-                            description={chart.description}
-                            image={chart.image}
-                        />
-                    ))}
 
                     <SectionDivider />
                     <EmailFooter />

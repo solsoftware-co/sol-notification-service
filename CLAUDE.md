@@ -8,6 +8,7 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - `GA4_SERVICE_ACCOUNT_JSON` env var — service account JSON string; required in production, optional in dev/preview (returns mock data when absent)
 - TypeScript 5.x / Node.js 20+ + `@react-email/components` (new), `@react-email/render` (new), `react ^18` (new), existing: `inngest ^3`, `resend ^3`, `@neondatabase/serverless ^1` (006-email-templates)
 - Neon PostgreSQL — no schema changes (006-email-templates)
+- TypeScript 5.x / Node.js 20+ + `@resvg/resvg-js ^2.6.2` (new — SVG→PNG), existing: `@react-email/render`, `resend ^3.x`, `inngest ^3.x` (007-analytics-email-charts)
 
 ## Project Structure
 
@@ -66,9 +67,9 @@ npm run email:preview  # Send a mock email and open the HTML preview in the brow
 - See `.specify/memory/constitution.md` for full architectural rules
 
 ## Recent Changes
+- 007-analytics-email-charts: Added TypeScript 5.x / Node.js 20+ + `@resvg/resvg-js ^2.6.2` (new — SVG→PNG), existing: `@react-email/render`, `resend ^3.x`, `inngest ^3.x`
 - 006-email-templates: Added TypeScript 5.x / Node.js 20+ + `@react-email/components` (new), `@react-email/render` (new), `react ^18` (new), existing: `inngest ^3`, `resend ^3`, `@neondatabase/serverless ^1`
 - 005-weekly-analytics-report: Added `@google-analytics/data ^4.x`; new functions `weekly-analytics-scheduler` + `weekly-analytics-report`; `GA4_SERVICE_ACCOUNT_JSON` env var; `getAllActiveClients()` in db.ts; `getAnalyticsReport()` in analytics.ts
-- feature/004-testing-ci: Vitest 2.x test suite + CI pipeline
 
 
 <!-- MANUAL ADDITIONS START -->

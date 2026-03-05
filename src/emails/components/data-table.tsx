@@ -2,7 +2,7 @@ import { Text } from '@react-email/components';
 import { colors, typography, borders, spacing } from '../styles';
 
 type DataTableProps = {
-    title: string;
+    title?: string;
     columns: string[];
     rows: string[][];
 };
