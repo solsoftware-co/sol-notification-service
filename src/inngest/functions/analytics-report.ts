@@ -96,9 +96,9 @@ function resolvePeriod(period: ReportPeriod, scheduledAt: string): ResolvedPerio
 // Inngest function
 // ---------------------------------------------------------------------------
 
-export const sendWeeklyAnalyticsReport = inngest.createFunction(
+export const sendAnalyticsReport = inngest.createFunction(
   {
-    id: "send-weekly-analytics-report",
+    id: "send-analytics-report",
     retries: 3,
   },
   { event: "analytics/report.requested" },
