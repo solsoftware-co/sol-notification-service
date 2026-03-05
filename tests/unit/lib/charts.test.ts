@@ -70,10 +70,10 @@ describe('generateDailyTrendChart', () => {
     expect(chart.type).toBe('line');
   });
 
-  it('maps dates to MM-DD labels', async () => {
+  it('maps dates to M/D labels without leading zeros', async () => {
     await generateDailyTrendChart(dailyMetrics);
     const chart = captureChartConfig() as any;
-    expect(chart.data.labels).toEqual(['02-23', '02-24', '02-25']);
+    expect(chart.data.labels).toEqual(['2/23', '2/24', '2/25']);
   });
 
   it('maps sessions to dataset values', async () => {
@@ -126,10 +126,20 @@ describe('generateTopSourcesChart', () => {
     expect(chart.type).toBe('bar');
   });
 
-  it('does not set indexAxis (vertical bars by default)', async () => {
-    await generateTopSourcesChart(sources);
+  it('does not set indexAxis when fewer than 8 sources (vertical bars)', async () => {
+    await generateTopSourcesChart(sources); // fixture has 3 sources
     const chart = captureChartConfig() as any;
     expect(chart.options.indexAxis).toBeUndefined();
+  });
+
+  it('sets indexAxis: y when 8 or more sources (horizontal bars)', async () => {
+    const manySources: TrafficSource[] = Array.from({ length: 8 }, (_, i) => ({
+      source: `source-${i}`,
+      sessions: 100 - i,
+    }));
+    await generateTopSourcesChart(manySources);
+    const chart = captureChartConfig() as any;
+    expect(chart.options.indexAxis).toBe('y');
   });
 
   it('maps source names to labels', async () => {
@@ -186,8 +196,8 @@ describe('generateTopPagesChart', () => {
     expect(chart.type).toBe('bar');
   });
 
-  it('does not set indexAxis (vertical bars by default)', async () => {
-    await generateTopPagesChart(pages);
+  it('does not set indexAxis when fewer than 8 pages (vertical bars)', async () => {
+    await generateTopPagesChart(pages); // fixture has 3 pages
     const chart = captureChartConfig() as any;
     expect(chart.options.indexAxis).toBeUndefined();
   });

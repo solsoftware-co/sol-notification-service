@@ -42,14 +42,24 @@ async function generateAreaChart(
             fill: true,
             borderColor: colors.accent,
             backgroundColor: colors.accentShading,
-            pointRadius: 3,
+            pointRadius: 4,
+            pointBackgroundColor: colors.accent,
             tension: 0.3,
             borderWidth: 2,
           },
         ],
       },
       options: {
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            anchor: 'end',
+            align: 'top',
+            color: colors.textSecondary,
+            font: { size: 10 },
+            formatter: 'function(value) { return value.toLocaleString("en-US"); }',
+          },
+        },
         scales: {
           x: {
             ticks: { color: colors.textMuted, font: { size: 11 } },
@@ -71,7 +81,8 @@ async function generateBarChart(
   values: number[],
   height?: number,
 ): Promise<Buffer> {
-  const h = height ?? labels.length * 40 + 40;
+  const isHorizontal = labels.length >= 8;
+  const h = height ?? (isHorizontal ? labels.length * 40 + 40 : 220);
   return callQuickChart(
     {
       type: 'bar',
@@ -86,7 +97,17 @@ async function generateBarChart(
         ],
       },
       options: {
-        plugins: { legend: { display: false } },
+        ...(isHorizontal ? { indexAxis: 'y' } : { layout: { padding: { top: 24 } } }),
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            anchor: 'end',
+            align: 'end',
+            color: colors.textSecondary,
+            font: { size: 10 },
+            formatter: 'function(value) { return value.toLocaleString("en-US"); }',
+          },
+        },
         scales: {
           x: {
             ticks: { color: colors.textMuted, font: { size: 11 } },
@@ -109,7 +130,10 @@ async function generateBarChart(
 
 export async function generateDailyTrendChart(metrics: DailyMetric[]): Promise<Buffer> {
   if (metrics.length === 0) throw new Error('generateDailyTrendChart: metrics array is empty');
-  const labels = metrics.map((m) => m.date.slice(5)); // "YYYY-MM-DD" → "MM-DD"
+  const labels = metrics.map((m) => {
+    const [, mm, dd] = m.date.split('-');
+    return `${parseInt(mm)}/${parseInt(dd)}`; // "YYYY-MM-DD" → "M/D"
+  });
   const values = metrics.map((m) => m.sessions);
   return generateAreaChart(labels, values);
 }

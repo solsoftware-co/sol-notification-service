@@ -110,14 +110,14 @@ export async function renderAnalyticsReportEmail(
 
   let sourcesChartBuf: Buffer | null = null;
   try {
-    sourcesChartBuf = await generateTopSourcesChart(report.topSources.slice(0, 7));
+    sourcesChartBuf = await generateTopSourcesChart(report.topSources);
   } catch (e) {
     log(`[charts] top sources chart failed: ${e}`);
   }
 
   let pagesChartBuf: Buffer | null = null;
   try {
-    pagesChartBuf = await generateTopPagesChart(report.topPages.slice(0, 7));
+    pagesChartBuf = await generateTopPagesChart(report.topPages);
   } catch (e) {
     log(`[charts] top pages chart failed: ${e}`);
   }

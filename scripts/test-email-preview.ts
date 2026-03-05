@@ -79,6 +79,9 @@ async function previewAnalytics() {
       { path: '/case-studies', views: 980 },
       { path: '/blog', views: 750 },
       { path: '/pricing', views: 620 },
+      { path: '/legal', views: 600 },
+      { path: '/learn-more', views: 540 },
+      { path: '/locations', views: 520 },
     ],
     dailyMetrics: [
       { date: '2026-02-23', sessions: 1540, activeUsers: 1120, newUsers: 180 },
