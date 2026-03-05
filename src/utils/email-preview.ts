@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { exec } from "node:child_process";
 import { join } from "node:path";
+import type { EmailAttachment } from "../types/index";
 
 const PREVIEW_DIR = join(process.cwd(), ".email-preview");
 const PREVIEW_FILE = join(PREVIEW_DIR, "last.html");
@@ -9,9 +10,27 @@ interface PreviewOptions {
   to: string;
   subject: string;
   html: string;
+  attachments?: EmailAttachment[];
 }
 
-function buildPreviewPage({ to, subject, html }: PreviewOptions): string {
+function resolveCidReferences(html: string, attachments: EmailAttachment[]): string {
+  let resolved = html;
+  for (const att of attachments) {
+    if (!att.content_id) continue;
+    const mime = att.content_type ?? "image/png";
+    const b64 = Buffer.isBuffer(att.content)
+      ? att.content.toString("base64")
+      : att.content;
+    resolved = resolved.replaceAll(
+      `cid:${att.content_id}`,
+      `data:${mime};base64,${b64}`,
+    );
+  }
+  return resolved;
+}
+
+function buildPreviewPage({ to, subject, html, attachments = [] }: PreviewOptions): string {
+  html = resolveCidReferences(html, attachments);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

@@ -29,6 +29,13 @@ async function loadBannerAttachment(): Promise<EmailAttachment> {
   };
 }
 
+function formatDateMDY(date: string): string {
+  // GA4 returns "YYYYMMDD"; ISO format is "YYYY-MM-DD" — normalise to "MM/DD/YYYY"
+  const s = date.includes('-') ? date : `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+  const [yyyy, mm, dd] = s.split('-');
+  return `${mm}/${dd}/${yyyy}`;
+}
+
 function formatDuration(secs: number): string {
   const m = Math.floor(secs / 60);
   const s = Math.round(secs % 60);
@@ -167,7 +174,7 @@ export async function renderAnalyticsReportEmail(
         views: p.views.toLocaleString(),
       })),
       dailyMetrics: report.dailyMetrics.map((d) => ({
-        date: d.date,
+        date: formatDateMDY(d.date),
         sessions: d.sessions.toLocaleString(),
         activeUsers: d.activeUsers.toLocaleString(),
         newUsers: d.newUsers.toLocaleString(),

@@ -70,10 +70,20 @@ describe('generateDailyTrendChart', () => {
     expect(chart.type).toBe('line');
   });
 
-  it('maps dates to M/D labels without leading zeros', async () => {
+  it('maps dates to M/D labels without leading zeros (ISO YYYY-MM-DD format)', async () => {
     await generateDailyTrendChart(dailyMetrics);
     const chart = captureChartConfig() as any;
     expect(chart.data.labels).toEqual(['2/23', '2/24', '2/25']);
+  });
+
+  it('maps YYYYMMDD dates (GA4 API format) to M/D labels without leading zeros', async () => {
+    const ga4Metrics: DailyMetric[] = [
+      { date: '20260201', sessions: 100, activeUsers: 80, newUsers: 20 },
+      { date: '20260215', sessions: 200, activeUsers: 160, newUsers: 40 },
+    ];
+    await generateDailyTrendChart(ga4Metrics);
+    const chart = captureChartConfig() as any;
+    expect(chart.data.labels).toEqual(['2/1', '2/15']);
   });
 
   it('maps sessions to dataset values', async () => {
