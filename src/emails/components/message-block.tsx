@@ -1,19 +1,23 @@
 import { Section, Text } from '@react-email/components';
-import { colors, typography, borders, spacing } from '../styles';
+import { colors, typography, borders, spacing, radii } from '../styles';
+import { LabelText } from './label-text';
 
 type MessageBlockProps = {
     message: string;
+    title?: string;
 };
 
-export function MessageBlock({ message }: MessageBlockProps) {
+export function MessageBlock({ message, title = 'COMMENTS' }: MessageBlockProps) {
     return (
         <Section>
             <div style={{
-                backgroundColor: colors.bg,
-                borderLeft: borders.messageAccent,
-                borderRadius: '0 4px 4px 0',
+                backgroundColor: colors.shading,
+                borderRadius: radii.messageBlock,
                 padding: spacing.md,
+                border: borders.card,
             }}>
+                {title && <LabelText>{title}</LabelText>}
+
                 <Text style={{
                     fontFamily: typography.fontStack,
                     fontSize: typography.sizes.body,
