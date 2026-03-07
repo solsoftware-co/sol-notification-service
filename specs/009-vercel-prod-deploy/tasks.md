@@ -39,9 +39,9 @@
 
 - [ ] T004 📋 Create a production database branch in Neon dashboard — go to Neon console → your project → Branches → Create Branch → name it `production` → copy the connection string (postgres://...) → save it as `DATABASE_URL` for use in T005 and T007
 - [ ] T005 📋 Initialise the production database schema — run `DATABASE_URL="<prod-connection-string>" npx tsx --env-file .env.local scripts/setup-db.ts` (or export DATABASE_URL and run `npm run db:setup`) → verify tables exist in Neon console
-- [ ] T006 [P] 📋 Create Inngest Cloud app and copy credentials — go to app.inngest.com → Create App → name it `sol-notification-service` → copy the **Signing Key** (save as `INNGEST_SIGNING_KEY`) → go to Manage → Event Keys → copy the default key (save as `INNGEST_EVENT_KEY`)
+- [ ] T006 [P] 📋 Create Inngest Cloud app via Vercel integration — go to app.inngest.com → Create App → choose **Connect to Vercel** → authorise the Inngest GitHub/Vercel OAuth → select your `sol-notification-service` Vercel project → Inngest will automatically inject `INNGEST_SIGNING_KEY` and `INNGEST_EVENT_KEY` into your Vercel project's environment variables and register your serve endpoint after each deploy
 
-**Checkpoint**: Production database has schema. You have all credential values needed to fill in Vercel env vars in Phase 3.
+**Checkpoint**: Production database has schema. Inngest is linked to your Vercel project — no manual credential copying required.
 
 ---
 
@@ -51,10 +51,10 @@
 
 **Independent Test**: `curl https://[your-app].vercel.app/api/health` returns `{"status":"ok"}`. A `form/submitted` event triggered from Inngest Cloud results in an email in Resend's sent log and a green run in the Inngest Cloud dashboard.
 
-- [ ] T007 [US1] 📋 Set all environment variables in Vercel dashboard — go to Vercel → Project → Settings → Environment Variables → add the following for **Production**: `DATABASE_URL` (Neon production connection string from T004), `RESEND_API_KEY` (from Resend dashboard), `RESEND_FROM` (`Sol Software <notifications@solsoftware.co>`), `INNGEST_SIGNING_KEY` (from T006), `INNGEST_EVENT_KEY` (from T006) — do NOT set `VERCEL_ENV` or `EMAIL_MODE`
+- [ ] T007 [US1] 📋 Set non-Inngest environment variables in Vercel dashboard — go to Vercel → Project → Settings → Environment Variables → add the following for **Production**: `DATABASE_URL` (Neon production connection string from T004), `RESEND_API_KEY` (from Resend dashboard), `RESEND_FROM` (`Sol Software <notifications@solsoftware.co>`) — do NOT set `VERCEL_ENV` or `EMAIL_MODE`; `INNGEST_SIGNING_KEY` and `INNGEST_EVENT_KEY` are injected automatically by the Inngest Vercel integration (T006)
 - [ ] T008 [US1] 📋 Deploy to production — push the `009-vercel-prod-deploy` branch to `main` (or merge the open PR #11 first, then push this branch) → watch Vercel dashboard for deployment to complete (60–90 seconds) → copy the production URL (e.g. `https://sol-notification-service.vercel.app`)
 - [ ] T009 [US1] 📋 Validate health check — run `curl https://[your-production-url]/api/health` → confirm response is `{"status":"ok"}`
-- [ ] T010 [US1] 📋 Register serve endpoint in Inngest Cloud — go to app.inngest.com → your app → Sync App → enter `https://[your-production-url]/api/inngest` → click Sync → verify all 4 functions are discovered: `send-form-notification`, `weekly-analytics-scheduler`, `send-analytics-report`, `hello-world`
+- [ ] T010 [US1] 📋 Verify Inngest functions are discovered — the Vercel integration auto-syncs after each deploy; go to app.inngest.com → your app → Functions → confirm all 4 are listed: `send-form-notification`, `weekly-analytics-scheduler`, `send-analytics-report`, `hello-world`; if they don't appear within 2 minutes of deploy completing, manually trigger a sync from the Inngest dashboard → App → Sync
 - [ ] T011 [US1] 📋 Run form-submission smoke test — in Inngest Cloud dashboard → Send Event → send `form/submitted` with `{ "clientId": "test-client", "submitterName": "Smoke Test", "submitterEmail": "test@example.com", "submitterMessage": "Production smoke test" }` → verify run shows all 4 steps green in Inngest Cloud → verify email appears in Resend dashboard → Logs
 
 **Checkpoint**: US1 complete. Application is live, health check passes, Inngest Cloud is connected, form notification delivers a real email.
@@ -170,6 +170,7 @@ T019 ──────────┘
 
 - `VERCEL_ENV` is auto-injected by Vercel — never set it manually or it may override the production routing
 - `EMAIL_MODE` must NOT be set — the app derives it from `VERCEL_ENV`; setting it manually could silently lock the app into mock or test mode
-- `INNGEST_SIGNING_KEY` must be set before the first deploy — if Inngest Cloud calls arrive before the key is present, signature verification fails and all workflow invocations are rejected
+- `INNGEST_SIGNING_KEY` and `INNGEST_EVENT_KEY` are auto-injected by the Inngest Vercel integration — do NOT set them manually or the integration may conflict
+- The Inngest Vercel integration also auto-registers the `/api/inngest` serve endpoint after each deploy — no manual URL registration needed
 - `GA4_SERVICE_ACCOUNT_JSON` must be a single-line JSON string (no newlines) — Vercel env var values cannot contain raw newlines; use `jq -c . service-account.json` to compact it
 - T020 (real client data) is required before the weekly cron delivers value to real clients — the seeded `test-client` will not have a real GA4 property or email address
