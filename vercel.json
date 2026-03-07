@@ -1,0 +1,9 @@
+{
+  "framework": null,
+  "buildCommand": "",
+  "outputDirectory": "",
+  "functions": {
+    "api/inngest.ts": { "maxDuration": 60 },
+    "api/health.ts":  { "maxDuration": 10 }
+  }
+}
