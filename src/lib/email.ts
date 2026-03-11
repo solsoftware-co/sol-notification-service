@@ -41,6 +41,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   }
 
   if (mode === "mailtrap") {
+    const subject = `[TEST: ${request.to}] ${request.subject}`;
     const transport = nodemailer.createTransport({
       host: "sandbox.smtp.mailtrap.io",
       port: 2525,
@@ -52,15 +53,15 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
     await transport.sendMail({
       from: request.from ?? config.resendFrom,
       to: request.to,
-      subject: request.subject,
+      subject,
       html: request.html,
     });
-    log(`[mailtrap] Sent to: ${request.to} | Subject: ${request.subject}`);
+    log(`[mailtrap] Sent to: ${request.to} | Subject: ${subject}`);
     return {
       mode,
       originalTo: request.to,
       actualTo: request.to,
-      subject: request.subject,
+      subject,
       outcome: "sent",
     };
   }
