@@ -48,7 +48,6 @@ export async function waitForEmail(
 
   while (Date.now() < deadline) {
     const messages = (await client.testing.messages.get(
-      accountId,
       inboxId
     )) as unknown as MailtrapMessage[];
 
