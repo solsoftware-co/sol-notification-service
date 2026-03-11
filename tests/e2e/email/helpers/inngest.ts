@@ -58,9 +58,13 @@ export async function waitForRunCompletion(
 
   const deadline = Date.now() + timeoutMs;
 
+  const inngestEnv = process.env.INNGEST_ENV;
+  const runHeaders: Record<string, string> = { Authorization: `Bearer ${signingKey}` };
+  if (inngestEnv) runHeaders["x-inngest-env"] = inngestEnv;
+
   while (Date.now() < deadline) {
     const res = await fetch(`https://api.inngest.com/v1/events/${eventId}/runs`, {
-      headers: { Authorization: `Bearer ${signingKey}` },
+      headers: runHeaders,
     });
 
     if (!res.ok) {
