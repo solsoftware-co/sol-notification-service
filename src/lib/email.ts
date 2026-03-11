@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { config } from "./config";
 import { log } from "../utils/logger";
 import { writeEmailPreview } from "../utils/email-preview";
@@ -36,6 +37,31 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
       actualTo: request.to,
       subject: request.subject,
       outcome: "logged",
+    };
+  }
+
+  if (mode === "mailtrap") {
+    const transport = nodemailer.createTransport({
+      host: "sandbox.smtp.mailtrap.io",
+      port: 2525,
+      auth: {
+        user: config.mailtrapSmtpUser!,
+        pass: config.mailtrapSmtpPass!,
+      },
+    });
+    await transport.sendMail({
+      from: request.from ?? config.resendFrom,
+      to: request.to,
+      subject: request.subject,
+      html: request.html,
+    });
+    log(`[mailtrap] Sent to: ${request.to} | Subject: ${request.subject}`);
+    return {
+      mode,
+      originalTo: request.to,
+      actualTo: request.to,
+      subject: request.subject,
+      outcome: "sent",
     };
   }
 

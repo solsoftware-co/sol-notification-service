@@ -21,16 +21,23 @@ This guide covers the one-time setup required to get the automated e2e email pip
 
 1. Sign up at [mailtrap.io](https://mailtrap.io) (free tier)
 2. Go to **Email Testing → Inboxes** → create an inbox (e.g. `sol-notification-ci`)
-3. From the inbox settings, note:
+3. Collect the following from the inbox:
+   - **SMTP credentials** — inbox → **Integrations** tab → select **Nodemailer** → note the `user` and `pass` values
    - **Account ID** — visible in the Mailtrap URL: `mailtrap.io/inboxes/{inboxId}`
    - **Inbox ID** — same URL
-   - **API Token** — go to **API Tokens** → create a token with `Inbox read/write` scope
+   - **API Token** — go to **API Tokens** (account menu) → create a token with `Inbox read/write` scope
 
-### 2. Set `TEST_EMAIL` in Vercel (Preview environment)
+### 2. Set email config in Vercel (Preview environment)
 
-The Mailtrap inbox does not have a real email address for receiving SMTP — it receives via the Resend → Mailtrap API path. Set `TEST_EMAIL` in Vercel's Preview environment to any address you control (e.g. `ci-test@yourdomain.com`). The pipeline will match emails by arrival timestamp and subject prefix, not by recipient address.
+The Preview deployment must send emails to the Mailtrap SMTP sandbox instead of Resend.
 
-> In Vercel dashboard → Project → Settings → Environment Variables → add `TEST_EMAIL` scoped to **Preview** only.
+In Vercel dashboard → Project → Settings → Environment Variables, add these scoped to **Preview** only:
+
+| Variable | Value |
+|----------|-------|
+| `EMAIL_MODE` | `mailtrap` |
+| `MAILTRAP_SMTP_USER` | SMTP user from step 1 |
+| `MAILTRAP_SMTP_PASS` | SMTP pass from step 1 |
 
 ### 3. Add GitHub Actions secrets
 
@@ -58,7 +65,7 @@ In GitHub → repository **Settings → Branches → Branch protection rules** f
 You can run the e2e test suite locally against any deployed Preview URL:
 
 ```bash
-# Install dependencies (includes @mailtrap/mailtrap-client as devDep)
+# Install dependencies
 npm install
 
 # Set environment variables
@@ -68,6 +75,7 @@ export INNGEST_SIGNING_KEY_STAGING=<staging signing key>
 export MAILTRAP_API_TOKEN=<token>
 export MAILTRAP_ACCOUNT_ID=<account id>
 export MAILTRAP_INBOX_ID=<inbox id>
+# Note: MAILTRAP_SMTP_USER/PASS are set in Vercel Preview env vars, not needed locally here
 
 # Run all e2e email tests
 npm run test:e2e
