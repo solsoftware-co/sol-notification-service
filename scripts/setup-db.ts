@@ -1,3 +1,5 @@
+// DEPRECATED: Replaced by the migration system. Use 'npm run db:migrate' instead.
+// See db/migrations/V001__initial_schema.sql and specs/011-db-schema-migrations/quickstart.md.
 import { db } from "../src/lib/db";
 
 async function setup(): Promise<void> {

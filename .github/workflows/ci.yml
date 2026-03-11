@@ -30,3 +30,86 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm test
+
+  # Validates migration SQL on every PR that touches db/migrations/.
+  # Uses an ephemeral postgres container — no credentials or shared state required.
+  migrate-check:
+    name: Validate Migrations
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    # Only run when migration files change
+    # Note: GitHub path filters on 'on:' apply per-workflow; this job uses a manual
+    # check via changed-files to avoid running on unrelated PRs.
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: migrate_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for migration file changes
+        id: changes
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '^db/migrations/' && echo "changed=true" >> $GITHUB_OUTPUT || echo "changed=false" >> $GITHUB_OUTPUT
+      - name: Skip if no migration changes
+        if: steps.changes.outputs.changed == 'false'
+        run: echo "No migration files changed — skipping validation."
+      - uses: actions/setup-node@v4
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        if: steps.changes.outputs.changed == 'true'
+        run: npm ci
+      - name: Run migrations against ephemeral database
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/migrate_test
+        run: npm run db:migrate
+
+  # Applies pending migrations to the production database on every merge to main
+  # that includes migration file changes. Runs before Vercel deploys new code.
+  #
+  # TWO-DEPLOY RULE: Destructive schema changes (column drops, renames, type changes)
+  # must be split across two PRs — migration in deploy 1, code cleanup in deploy 2.
+  # See specs/011-db-schema-migrations/quickstart.md for details.
+  migrate-deploy:
+    name: Deploy Migrations
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [type-check, test]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Check for migration file changes
+        id: changes
+        run: |
+          git diff --name-only HEAD~1 HEAD | grep '^db/migrations/' && echo "changed=true" >> $GITHUB_OUTPUT || echo "changed=false" >> $GITHUB_OUTPUT
+      - name: Skip if no migration changes
+        if: steps.changes.outputs.changed == 'false'
+        run: echo "No migration files changed — skipping deploy."
+      - uses: actions/setup-node@v4
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        if: steps.changes.outputs.changed == 'true'
+        run: npm ci
+      - name: Apply migrations to production database
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: npm run db:migrate
