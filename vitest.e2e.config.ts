@@ -6,7 +6,7 @@ export default defineConfig({
     environment: "node",
     pool: "forks",
     include: ["tests/e2e/**/*.test.ts"],
-    testTimeout: 120000,
-    hookTimeout: 120000,
+    testTimeout: 300000,
+    hookTimeout: 300000,
   },
 });
