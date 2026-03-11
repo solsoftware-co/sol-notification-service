@@ -151,6 +151,32 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Write job summary
+        run: |
+          WA="${{ needs.e2e-weekly-analytics.result }}"
+          FN="${{ needs.e2e-form-notification.result }}"
+
+          status_icon() {
+            case "$1" in
+              success)  echo "✅" ;;
+              skipped)  echo "⏭️" ;;
+              failure)  echo "❌" ;;
+              *)        echo "⚠️" ;;
+            esac
+          }
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## E2E Email Test Results
+
+          | Flow | Status |
+          |------|--------|
+          | Weekly Analytics | $(status_icon $WA) \`$WA\` |
+          | Form Notification | $(status_icon $FN) \`$FN\` |
+
+          **Branch:** \`${{ github.head_ref }}\` · **Commit:** \`${{ github.event.pull_request.head.sha }}\`
+          > Skipped flows had no changed files — gate passes automatically.
+          EOF
+
       - name: Check all required jobs passed or were skipped
         run: |
           echo '${{ toJSON(needs) }}' | jq -e '
