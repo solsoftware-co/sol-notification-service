@@ -69,11 +69,25 @@ jobs:
           exit 1
 
       - name: Sync Inngest app with Preview deployment
+        env:
+          INNGEST_SIGNING_KEY_STAGING: ${{ secrets.INNGEST_SIGNING_KEY_STAGING }}
         run: |
           PREVIEW_URL="${{ steps.wait.outputs.url }}"
-          echo "Syncing Inngest at ${PREVIEW_URL}/api/inngest"
-          curl -s -X PUT "${PREVIEW_URL}/api/inngest" || true
-          sleep 10
+          echo "=== Step 1: PUT to app sync endpoint ==="
+          curl -s -w "\nHTTP %{http_code}" -X PUT "${PREVIEW_URL}/api/inngest" \
+            -H "Content-Type: application/json" || true
+
+          echo ""
+          echo "=== Step 2: POST to Inngest Cloud registration API ==="
+          curl -s -w "\nHTTP %{http_code}" \
+            -X POST "https://api.inngest.com/fn/register" \
+            -H "Authorization: Bearer ${INNGEST_SIGNING_KEY_STAGING}" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\": \"${PREVIEW_URL}/api/inngest\"}" || true
+
+          echo ""
+          echo "Waiting 20s for sync to propagate..."
+          sleep 20
 
   # ── Step 3a: Run weekly analytics e2e tests (if affected) ─────────────────
   e2e-weekly-analytics:
