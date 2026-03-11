@@ -47,11 +47,26 @@ jobs:
     outputs:
       url: ${{ steps.wait.outputs.url }}
     steps:
-      - uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
+      - name: Wait for Vercel Preview deployment
         id: wait
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          max_timeout: 180
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          SHA="${{ github.event.pull_request.head.sha }}"
+          for i in $(seq 1 30); do
+            RESULT=$(curl -s "https://api.vercel.com/v6/deployments?meta-githubCommitSha=${SHA}&limit=5" \
+              -H "Authorization: Bearer ${VERCEL_TOKEN}")
+            URL=$(echo "$RESULT" | jq -r '.deployments[] | select(.state=="READY") | .url' | head -1)
+            if [ -n "$URL" ]; then
+              echo "url=https://${URL}" >> $GITHUB_OUTPUT
+              echo "Found deployment: https://${URL}"
+              exit 0
+            fi
+            echo "Waiting for deployment... (attempt $i/30)"
+            sleep 10
+          done
+          echo "Timed out waiting for Vercel deployment"
+          exit 1
 
   # ── Step 3a: Run weekly analytics e2e tests (if affected) ─────────────────
   e2e-weekly-analytics:
