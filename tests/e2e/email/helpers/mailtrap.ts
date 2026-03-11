@@ -13,7 +13,7 @@ export interface MailtrapMessage {
 function getClient(): MailtrapClient {
   const token = process.env.MAILTRAP_API_TOKEN;
   if (!token) throw new Error("MAILTRAP_API_TOKEN environment variable is required");
-  return new MailtrapClient({ token });
+  return new MailtrapClient({ token, accountId: getAccountId() });
 }
 
 function getAccountId(): number {
