@@ -1,4 +1,4 @@
-import { MailtrapClient, type Message } from "mailtrap";
+import { MailtrapClient, type Message, type Attachment } from "mailtrap";
 
 export interface MailtrapMessage {
   id: number;
@@ -25,6 +25,17 @@ function getInboxId(): number {
   const id = process.env.MAILTRAP_INBOX_ID;
   if (!id) throw new Error("MAILTRAP_INBOX_ID environment variable is required");
   return Number(id);
+}
+
+export { type Attachment };
+
+/**
+ * Returns the list of attachments for a given message ID.
+ */
+export async function getEmailAttachments(messageId: number): Promise<Attachment[]> {
+  const client = getClient();
+  const inboxId = getInboxId();
+  return client.testing.attachments.getList(inboxId, messageId);
 }
 
 /**

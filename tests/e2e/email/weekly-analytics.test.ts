@@ -1,17 +1,19 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { triggerFlow } from "./helpers/inngest";
-import { waitForEmail, type MailtrapMessage } from "./helpers/mailtrap";
+import { waitForEmail, getEmailAttachments, type MailtrapMessage, type Attachment } from "./helpers/mailtrap";
 import { FLOW_MAP } from "./flow-map";
 
 const flow = FLOW_MAP["weekly-analytics"];
 
 describe("Weekly Analytics Email — End-to-End", () => {
   let email: MailtrapMessage;
+  let attachments: Attachment[];
 
   beforeAll(async () => {
     const triggeredAt = new Date();
     await triggerFlow(flow.event, flow.eventData);
     email = await waitForEmail(/\[TEST:.*\].*(?:analytics|report)/i, triggeredAt);
+    attachments = await getEmailAttachments(email.id);
   });
 
   // T009: Subject assertions
@@ -52,5 +54,18 @@ describe("Weekly Analytics Email — End-to-End", () => {
   // T013: Populated value assertions
   it("contains at least one numeric metric value", () => {
     expect(email.html_body).toMatch(/\d+/);
+  });
+
+  // T014: Inline image attachment assertions
+  it("includes the banner image as an inline attachment", () => {
+    const banner = attachments.find((a) => a.content_id === "banner_image.png");
+    expect(banner).toBeDefined();
+    expect(banner?.content_type).toMatch(/image/);
+  });
+
+  it("includes the analytics chart as an inline attachment", () => {
+    const chart = attachments.find((a) => a.filename.match(/chart|graph|analytics/i));
+    expect(chart).toBeDefined();
+    expect(chart?.content_type).toMatch(/image/);
   });
 });
