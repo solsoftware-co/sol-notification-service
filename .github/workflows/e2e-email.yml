@@ -1,0 +1,114 @@
+name: E2E Email Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Step 1: Detect which email flows were affected by this PR ─────────────
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      weekly-analytics: ${{ steps.filter.outputs.weekly-analytics }}
+      form-notification: ${{ steps.filter.outputs.form-notification }}
+      shared: ${{ steps.filter.outputs.shared }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            weekly-analytics:
+              - 'src/inngest/functions/analytics-report.ts'
+              - 'src/inngest/functions/weekly-analytics-scheduler.ts'
+            form-notification:
+              - 'src/inngest/functions/form-notification.ts'
+            shared:
+              - 'src/lib/email.ts'
+              - 'src/lib/config.ts'
+              - 'src/inngest/functions/index.ts'
+              - 'src/types/index.ts'
+
+  # ── Step 2: Wait for Vercel Preview deployment to be ready ────────────────
+  wait-for-deployment:
+    needs: detect-changes
+    # Only wait if at least one email flow is affected
+    if: |
+      needs.detect-changes.outputs.weekly-analytics == 'true' ||
+      needs.detect-changes.outputs.form-notification == 'true' ||
+      needs.detect-changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.wait.outputs.url }}
+    steps:
+      - uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
+        id: wait
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          max_timeout: 180
+
+  # ── Step 3a: Run weekly analytics e2e tests (if affected) ─────────────────
+  e2e-weekly-analytics:
+    needs: [detect-changes, wait-for-deployment]
+    if: |
+      always() &&
+      needs.wait-for-deployment.result == 'success' &&
+      (needs.detect-changes.outputs.weekly-analytics == 'true' ||
+       needs.detect-changes.outputs.shared == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Run weekly analytics e2e tests
+        run: npm run test:e2e -- weekly-analytics --reporter=verbose
+        env:
+          PREVIEW_URL: ${{ needs.wait-for-deployment.outputs.url }}
+          INNGEST_EVENT_KEY_STAGING: ${{ secrets.INNGEST_EVENT_KEY_STAGING }}
+          INNGEST_SIGNING_KEY_STAGING: ${{ secrets.INNGEST_SIGNING_KEY_STAGING }}
+          MAILTRAP_API_TOKEN: ${{ secrets.MAILTRAP_API_TOKEN }}
+          MAILTRAP_ACCOUNT_ID: ${{ secrets.MAILTRAP_ACCOUNT_ID }}
+          MAILTRAP_INBOX_ID: ${{ secrets.MAILTRAP_INBOX_ID }}
+
+  # ── Step 3b: Run form notification e2e tests (if affected) ────────────────
+  e2e-form-notification:
+    needs: [detect-changes, wait-for-deployment]
+    if: |
+      always() &&
+      needs.wait-for-deployment.result == 'success' &&
+      (needs.detect-changes.outputs.form-notification == 'true' ||
+       needs.detect-changes.outputs.shared == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Run form notification e2e tests
+        run: npm run test:e2e -- form-notification --reporter=verbose
+        env:
+          PREVIEW_URL: ${{ needs.wait-for-deployment.outputs.url }}
+          INNGEST_EVENT_KEY_STAGING: ${{ secrets.INNGEST_EVENT_KEY_STAGING }}
+          INNGEST_SIGNING_KEY_STAGING: ${{ secrets.INNGEST_SIGNING_KEY_STAGING }}
+          MAILTRAP_API_TOKEN: ${{ secrets.MAILTRAP_API_TOKEN }}
+          MAILTRAP_ACCOUNT_ID: ${{ secrets.MAILTRAP_ACCOUNT_ID }}
+          MAILTRAP_INBOX_ID: ${{ secrets.MAILTRAP_INBOX_ID }}
+
+  # ── Step 4: Gate — the ONLY required status check on main ─────────────────
+  # Succeeds if all upstream jobs passed OR were skipped (no relevant files changed).
+  # Set ONLY this job as required in branch protection settings.
+  ci-gate:
+    needs: [e2e-weekly-analytics, e2e-form-notification]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all required jobs passed or were skipped
+        run: |
+          echo '${{ toJSON(needs) }}' | jq -e '
+            [.[] | .result] | all(. == "success" or . == "skipped")
+          '

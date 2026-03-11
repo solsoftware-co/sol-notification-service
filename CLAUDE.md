@@ -13,6 +13,7 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - N/A — no database schema changes (008-structured-logging)
 - TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (ships `inngest/vercel` adapter — no new packages needed) (009-vercel-prod-deploy)
 - Neon PostgreSQL (production branch — separate `DATABASE_URL` from dev) (009-vercel-prod-deploy)
+- None — no database schema changes (010-e2e-email-ci)
 
 ## Project Structure
 
@@ -70,10 +71,20 @@ npm run email:preview  # Send a mock email and open the HTML preview in the brow
 - `@neondatabase/serverless` Pool requires `ws` + `neonConfig.webSocketConstructor = ws` on Node.js 20 (no native WebSocket until Node 22) — already configured in `src/lib/db.ts`
 - See `.specify/memory/constitution.md` for full architectural rules
 
+## E2E Email Testing (feature 010)
+
+When adding a new Inngest email workflow, register it in the e2e test suite — **three files, always**:
+
+1. **`tests/e2e/email/flow-map.ts`** — add an entry to `FLOW_MAP` with `patterns`, `event`, `eventData`, and `testFile`
+2. **`tests/e2e/email/<flow-name>.test.ts`** — create the Vitest test file (copy `weekly-analytics.test.ts` as a template)
+3. **`.github/workflows/e2e-email.yml`** — add the path filter to `detect-changes` and a conditional job for the new flow; add the new job to `ci-gate`'s `needs` array
+
+Run locally with: `PREVIEW_URL=<url> INNGEST_EVENT_KEY_STAGING=<key> ... npm run test:e2e`
+
 ## Recent Changes
+- 010-e2e-email-ci: Added automated e2e email testing pipeline — `tests/e2e/email/` + `.github/workflows/e2e-email.yml`
 - 009-vercel-prod-deploy: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (ships `inngest/vercel` adapter — no new packages needed)
 - 008-structured-logging: Replaced console.log logger with `pino` + Better Stack (`@logtail/pino`). `src/utils/logger.ts` exports `log()`, `logError()`, `flush()`. Dev: pino-pretty (colorized stdout). Non-dev+token: Better Stack. Non-dev+no token: stdout JSON fallback. `LOGTAIL_SOURCE_TOKEN` via `config.logtailToken`. Never import pino directly.
-- 007-analytics-email-charts: Added TypeScript 5.x / Node.js 20+ + `@resvg/resvg-js ^2.6.2` (new — SVG→PNG), existing: `@react-email/render`, `resend ^3.x`, `inngest ^3.x`
 
 
 <!-- MANUAL ADDITIONS START -->
