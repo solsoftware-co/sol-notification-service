@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   # ── Step 1: Detect which email flows were affected by this PR ─────────────
   detect-changes:
