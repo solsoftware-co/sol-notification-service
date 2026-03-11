@@ -5,6 +5,8 @@ export default defineConfig({
     globals: true,
     environment: "node",
     pool: "forks",
-    exclude: ["**/node_modules/**", "tests/e2e/**"],
+    include: ["tests/e2e/**/*.test.ts"],
+    testTimeout: 300000,
+    hookTimeout: 300000,
   },
 });

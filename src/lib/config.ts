@@ -10,11 +10,11 @@ function deriveEnv(): AppEnv {
 function deriveEmailMode(env: AppEnv): EmailMode {
   const override = process.env.EMAIL_MODE;
   if (override !== undefined) {
-    if (override === "mock" || override === "test" || override === "live") {
+    if (override === "mock" || override === "test" || override === "live" || override === "mailtrap") {
       return override;
     }
     throw new Error(
-      `EMAIL_MODE="${override}" is not recognized. Valid values: mock, test, live`
+      `EMAIL_MODE="${override}" is not recognized. Valid values: mock, test, live, mailtrap`
     );
   }
   if (env === "production") return "live";
@@ -35,6 +35,8 @@ function buildConfig(): AppConfig {
   const resendApiKey = process.env.RESEND_API_KEY ?? null;
   const resendFrom =
     process.env.RESEND_FROM ?? "Notifications <notifications@example.com>";
+  const mailtrapSmtpUser = process.env.MAILTRAP_SMTP_USER ?? null;
+  const mailtrapSmtpPass = process.env.MAILTRAP_SMTP_PASS ?? null;
 
   if (emailMode === "live" && !resendApiKey) {
     throw new Error(
@@ -48,6 +50,12 @@ function buildConfig(): AppConfig {
     );
   }
 
+  if (emailMode === "mailtrap" && (!mailtrapSmtpUser || !mailtrapSmtpPass)) {
+    throw new Error(
+      "EMAIL_MODE=mailtrap requires MAILTRAP_SMTP_USER and MAILTRAP_SMTP_PASS environment variables to be set"
+    );
+  }
+
   const ga4CredentialsJson = process.env.GA4_SERVICE_ACCOUNT_JSON ?? null;
 
   if (env === "production" && !ga4CredentialsJson) {
@@ -58,7 +66,7 @@ function buildConfig(): AppConfig {
 
   const logtailToken = process.env.LOGTAIL_SOURCE_TOKEN ?? null;
 
-  return { env, emailMode, testEmail, resendApiKey, resendFrom, databaseUrl, ga4CredentialsJson, logtailToken };
+  return { env, emailMode, testEmail, resendApiKey, resendFrom, databaseUrl, ga4CredentialsJson, logtailToken, mailtrapSmtpUser, mailtrapSmtpPass };
 }
 
 export const config: AppConfig = buildConfig();

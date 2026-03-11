@@ -1,5 +1,5 @@
 export type AppEnv = "development" | "preview" | "production";
-export type EmailMode = "mock" | "test" | "live";
+export type EmailMode = "mock" | "test" | "live" | "mailtrap";
 
 export interface AppConfig {
   env: AppEnv;
@@ -10,6 +10,8 @@ export interface AppConfig {
   databaseUrl: string;
   ga4CredentialsJson: string | null;
   logtailToken: string | null;
+  mailtrapSmtpUser: string | null;
+  mailtrapSmtpPass: string | null;
 }
 
 // ---------------------------------------------------------------------------

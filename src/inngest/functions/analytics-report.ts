@@ -138,6 +138,8 @@ export const sendAnalyticsReport = inngest.createFunction(
       });
     });
 
+    log("Hello World, I'm here!");
+
     const result = await step.run("send-email", async () => {
       const rendered = await renderAnalyticsReportEmail(report, client, resolvedPeriod);
       return sendEmail({

@@ -168,6 +168,7 @@ constitution amendment (MINOR bump minimum; MAJOR if a core service is replaced)
 | Logging (dev pretty-print) | pino-pretty | devDep |
 | Log transport | @logtail/pino | ^3.x |
 | Log management | Better Stack | Free plan |
+| E2E test email inbox | mailtrap (devDep, CI only) | ^4.x |
 
 **Explicitly out-of-scope for PoC:** SMS (Twilio), Slack, push notifications (Firebase),
 client self-service UI, advanced analytics, load testing infrastructure.
@@ -250,4 +251,4 @@ gates in `plan-template.md` before merge. Violations of Principle VI (unapproved
 infrastructure) MUST be justified in the plan's Complexity Tracking table with explicit
 rationale for why no simpler approach exists.
 
-**Version**: 1.1.0 | **Ratified**: 2026-02-13 | **Last Amended**: 2026-03-05
+**Version**: 1.1.1 | **Ratified**: 2026-02-13 | **Last Amended**: 2026-03-07

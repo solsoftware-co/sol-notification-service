@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { config } from "./config";
 import { log } from "../utils/logger";
 import { writeEmailPreview } from "../utils/email-preview";
@@ -36,6 +37,39 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
       actualTo: request.to,
       subject: request.subject,
       outcome: "logged",
+    };
+  }
+
+  if (mode === "mailtrap") {
+    const subject = `[TEST: ${request.to}] ${request.subject}`;
+    const transport = nodemailer.createTransport({
+      host: "sandbox.smtp.mailtrap.io",
+      port: 2525,
+      auth: {
+        user: config.mailtrapSmtpUser!,
+        pass: config.mailtrapSmtpPass!,
+      },
+    });
+    const attachments = request.attachments?.map((a: EmailAttachment) => ({
+      filename: a.filename,
+      content: a.content,
+      ...(a.content_id   ? { cid: a.content_id }             : {}),
+      ...(a.content_type ? { contentType: a.content_type }   : {}),
+    }));
+    await transport.sendMail({
+      from: request.from ?? config.resendFrom,
+      to: request.to,
+      subject,
+      html: request.html,
+      ...(attachments?.length ? { attachments } : {}),
+    });
+    log(`[mailtrap] Sent to: ${request.to} | Subject: ${subject}`);
+    return {
+      mode,
+      originalTo: request.to,
+      actualTo: request.to,
+      subject,
+      outcome: "sent",
     };
   }
 
