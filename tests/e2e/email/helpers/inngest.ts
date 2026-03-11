@@ -19,9 +19,13 @@ export async function triggerFlow(
     throw new Error("INNGEST_EVENT_KEY_STAGING environment variable is required");
   }
 
+  const inngestEnv = process.env.INNGEST_ENV;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (inngestEnv) headers["x-inngest-env"] = inngestEnv;
+
   const res = await fetch(`https://inn.gs/e/${eventKey}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ name: eventName, data }),
   });
 
