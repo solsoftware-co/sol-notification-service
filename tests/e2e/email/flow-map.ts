@@ -24,7 +24,11 @@ export const FLOW_MAP: Record<string, FlowConfig> = {
       "src/inngest/functions/weekly-analytics-scheduler.ts",
     ],
     event: "analytics/report.requested",
-    eventData: { clientId: "client-acme" },
+    eventData: {
+      clientId: "client-acme",
+      reportPeriod: { preset: "last_week" },
+      scheduledAt: new Date().toISOString(),
+    },
     testFile: "weekly-analytics.test.ts",
   },
 
