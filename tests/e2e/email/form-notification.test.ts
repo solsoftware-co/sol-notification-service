@@ -11,7 +11,7 @@ describe("Form Notification Email — End-to-End", () => {
   beforeAll(async () => {
     const triggeredAt = new Date();
     await triggerFlow(flow.event, flow.eventData);
-    email = await waitForEmail(/\[TEST:/i, triggeredAt);
+    email = await waitForEmail(/\[TEST:.*\].*(?:submission|inquiry|form)/i, triggeredAt);
   });
 
   // Subject assertions

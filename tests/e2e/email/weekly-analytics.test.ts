@@ -11,7 +11,7 @@ describe("Weekly Analytics Email — End-to-End", () => {
   beforeAll(async () => {
     const triggeredAt = new Date();
     await triggerFlow(flow.event, flow.eventData);
-    email = await waitForEmail(/\[TEST:/i, triggeredAt);
+    email = await waitForEmail(/\[TEST:.*\].*(?:analytics|report)/i, triggeredAt);
   });
 
   // T009: Subject assertions
