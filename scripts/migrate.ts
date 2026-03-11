@@ -1,8 +1,10 @@
 import { readdir, readFile } from "fs/promises";
 import { join, basename } from "path";
-import { db } from "../src/lib/db";
+import { Pool } from "pg";
 
 const MIGRATIONS_DIR = join(__dirname, "../db/migrations");
+
+const db = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function bootstrap(): Promise<void> {
   await db.query(`
