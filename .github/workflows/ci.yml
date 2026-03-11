@@ -76,7 +76,7 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/migrate_test
-        run: npm run db:migrate
+        run: npx tsx scripts/migrate.ts
 
   # Applies pending migrations to the production database on every merge to main
   # that includes migration file changes. Runs before Vercel deploys new code.
@@ -112,4 +112,4 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
-        run: npm run db:migrate
+        run: npx tsx scripts/migrate.ts
