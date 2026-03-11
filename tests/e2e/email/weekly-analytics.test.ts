@@ -68,4 +68,11 @@ describe("Weekly Analytics Email — End-to-End", () => {
     expect(chart).toBeDefined();
     expect(chart?.content_type).toMatch(/image/);
   });
+
+  // Banner attachment assertion
+  it("includes the Sol Software banner as an inline attachment", () => {
+    const banner = attachments.find((a) => a.content_id === "banner_image.png");
+    expect(banner).toBeDefined();
+    expect(banner?.content_type).toMatch(/image/);
+  });
 });
