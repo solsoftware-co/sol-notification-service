@@ -14,6 +14,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (ships `inngest/vercel` adapter — no new packages needed) (009-vercel-prod-deploy)
 - Neon PostgreSQL (production branch — separate `DATABASE_URL` from dev) (009-vercel-prod-deploy)
 - None — no database schema changes (010-e2e-email-ci)
+- TypeScript 5.x / Node.js 20+ + `@neondatabase/serverless ^1.x`, `ws ^8.x`, `tsx ^4.x` (all existing — zero new packages) (011-db-schema-migrations)
+- Neon PostgreSQL — adds `schema_migrations` tracking table (011-db-schema-migrations)
 
 ## Project Structure
 
@@ -39,8 +41,12 @@ src/
         ├── weekly-analytics-scheduler.ts  # Cron (Tue 09:00 UTC) + manual trigger; fans out per-client events
         └── weekly-analytics-report.ts     # Per-client worker: fetch GA4 data, build + send email
 
+db/
+└── migrations/                     # Versioned SQL migration files (V###__description.sql)
+
 scripts/
-├── setup-db.ts                     # Idempotent table creation (npm run db:setup)
+├── migrate.ts                      # Migration runner — apply + status modes (npm run db:migrate)
+├── setup-db.ts                     # DEPRECATED — replaced by db:migrate
 ├── seed-data.ts                    # Insert test clients (npm run db:seed)
 └── test-email-preview.ts           # Trigger mock email preview (npm run email:preview)
 
@@ -51,12 +57,13 @@ specs/                              # Feature specs, plans, research (per featur
 ## Commands
 
 ```bash
-npm run dev            # Start app server + Inngest Dev Server concurrently
-npm run build          # Compile TypeScript to dist/
-npm run type-check     # Type-check without emitting
-npm run db:setup       # Create database tables (idempotent)
-npm run db:seed        # Seed test client records
-npm run email:preview  # Send a mock email and open the HTML preview in the browser
+npm run dev                # Start app server + Inngest Dev Server concurrently
+npm run build              # Compile TypeScript to dist/
+npm run type-check         # Type-check without emitting
+npm run db:migrate         # Apply all pending migrations (safe to re-run; idempotent)
+npm run db:migrate:status  # Show applied vs pending migrations without making changes
+npm run db:seed            # Seed test client records
+npm run email:preview      # Send a mock email and open the HTML preview in the browser
 ```
 
 ## Code Style
@@ -82,9 +89,9 @@ When adding a new Inngest email workflow, register it in the e2e test suite — 
 Run locally with: `PREVIEW_URL=<url> INNGEST_EVENT_KEY_STAGING=<key> ... npm run test:e2e`
 
 ## Recent Changes
+- 011-db-schema-migrations: Added TypeScript 5.x / Node.js 20+ + `@neondatabase/serverless ^1.x`, `ws ^8.x`, `tsx ^4.x` (all existing — zero new packages)
 - 010-e2e-email-ci: Added automated e2e email testing pipeline — `tests/e2e/email/` + `.github/workflows/e2e-email.yml`
 - 009-vercel-prod-deploy: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (ships `inngest/vercel` adapter — no new packages needed)
-- 008-structured-logging: Replaced console.log logger with `pino` + Better Stack (`@logtail/pino`). `src/utils/logger.ts` exports `log()`, `logError()`, `flush()`. Dev: pino-pretty (colorized stdout). Non-dev+token: Better Stack. Non-dev+no token: stdout JSON fallback. `LOGTAIL_SOURCE_TOKEN` via `config.logtailToken`. Never import pino directly.
 
 
 <!-- MANUAL ADDITIONS START -->
