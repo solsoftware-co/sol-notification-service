@@ -1,13 +1,12 @@
-import { MailtrapClient } from "mailtrap";
+import { MailtrapClient, type Message } from "mailtrap";
 
 export interface MailtrapMessage {
   id: number;
   subject: string;
   to_email: string;
   from_email: string;
-  html_body: string;
-  text_body: string;
   created_at: string;
+  html_body: string;
 }
 
 function getClient(): MailtrapClient {
@@ -30,7 +29,8 @@ function getInboxId(): number {
 
 /**
  * Polls the Mailtrap test inbox until an email matching `subjectPattern`
- * arrives with a `created_at` timestamp >= `triggeredAt`.
+ * arrives with a `created_at` timestamp >= `triggeredAt`, then fetches
+ * its HTML body separately (the list endpoint doesn't include it).
  *
  * The timestamp window ensures concurrent PR runs don't pick up each other's
  * emails even when sharing a single free-tier inbox.
@@ -42,22 +42,29 @@ export async function waitForEmail(
   intervalMs = 3000
 ): Promise<MailtrapMessage> {
   const client = getClient();
-  const accountId = getAccountId();
   const inboxId = getInboxId();
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
-    const messages = (await client.testing.messages.get(
-      inboxId
-    )) as unknown as MailtrapMessage[];
+    const messages = await client.testing.messages.get(inboxId);
 
     const match = messages.find(
-      (m) =>
+      (m: Message) =>
         new Date(m.created_at) >= triggeredAt &&
         subjectPattern.test(m.subject)
     );
 
-    if (match) return match;
+    if (match) {
+      const html_body = await client.testing.messages.getHtmlMessage(inboxId, match.id);
+      return {
+        id: match.id,
+        subject: match.subject,
+        to_email: match.to_email,
+        from_email: match.from_email,
+        created_at: match.created_at,
+        html_body,
+      };
+    }
 
     await new Promise((r) => setTimeout(r, intervalMs));
   }
