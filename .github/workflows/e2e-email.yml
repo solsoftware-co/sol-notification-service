@@ -68,6 +68,13 @@ jobs:
           echo "Timed out waiting for Vercel deployment"
           exit 1
 
+      - name: Sync Inngest app with Preview deployment
+        run: |
+          PREVIEW_URL="${{ steps.wait.outputs.url }}"
+          echo "Syncing Inngest at ${PREVIEW_URL}/api/inngest"
+          curl -s -X PUT "${PREVIEW_URL}/api/inngest" || true
+          sleep 10
+
   # ── Step 3a: Run weekly analytics e2e tests (if affected) ─────────────────
   e2e-weekly-analytics:
     needs: [detect-changes, wait-for-deployment]
