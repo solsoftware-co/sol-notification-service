@@ -16,6 +16,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - None — no database schema changes (010-e2e-email-ci)
 - TypeScript 5.x / Node.js 20+ + `@neondatabase/serverless ^1.x`, `ws ^8.x`, `tsx ^4.x` (all existing — zero new packages) (011-db-schema-migrations)
 - Neon PostgreSQL — adds `schema_migrations` tracking table (011-db-schema-migrations)
+- TypeScript 5.x / Node.js 20+ + inngest ^3.x, @neondatabase/serverless ^1.x, pino ^10.x (all existing — no new packages) (012-notification-logging)
+- Neon PostgreSQL — `notification_logs` table extended via V002 migration (012-notification-logging)
 
 ## Project Structure
 
@@ -89,9 +91,9 @@ When adding a new Inngest email workflow, register it in the e2e test suite — 
 Run locally with: `PREVIEW_URL=<url> INNGEST_EVENT_KEY_STAGING=<key> ... npm run test:e2e`
 
 ## Recent Changes
+- 012-notification-logging: Added TypeScript 5.x / Node.js 20+ + inngest ^3.x, @neondatabase/serverless ^1.x, pino ^10.x (all existing — no new packages)
 - 011-db-schema-migrations: Added TypeScript 5.x / Node.js 20+ + `@neondatabase/serverless ^1.x`, `ws ^8.x`, `tsx ^4.x` (all existing — zero new packages)
 - 010-e2e-email-ci: Added automated e2e email testing pipeline — `tests/e2e/email/` + `.github/workflows/e2e-email.yml`
-- 009-vercel-prod-deploy: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` (ships `inngest/vercel` adapter — no new packages needed)
 
 
 <!-- MANUAL ADDITIONS START -->

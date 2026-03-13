@@ -90,8 +90,25 @@ export interface NotificationLogRow {
   client_id: string;
   workflow: string;
   event_name: string;
-  outcome: "success" | "failed" | "skipped";
+  outcome: "sent" | "failed" | "skipped";
+  recipient_email: string | null;
+  subject: string | null;
+  resend_id: string | null;
+  error_message: string | null;
+  metadata: Record<string, unknown>;
   created_at: Date;
+}
+
+export interface NotificationLogEntry {
+  client_id: string;
+  workflow: string;
+  event_name: string;
+  outcome: "sent" | "failed" | "skipped";
+  recipient_email: string;
+  subject: string;
+  resend_id?: string;
+  error_message?: string;
+  metadata: Record<string, unknown>;
 }
 
 export interface EmailAttachment {

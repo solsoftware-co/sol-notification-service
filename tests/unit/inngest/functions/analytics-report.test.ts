@@ -4,6 +4,7 @@ const mockGetClientById = vi.hoisted(() => vi.fn());
 const mockGetAnalyticsReport = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockRenderAnalyticsReport = vi.hoisted(() => vi.fn());
+const mockWriteNotificationLog = vi.hoisted(() => vi.fn());
 
 // config MUST be mocked first to prevent throw-at-import from buildConfig()
 vi.mock("../../../../src/lib/config", () => ({
@@ -20,6 +21,7 @@ vi.mock("../../../../src/lib/config", () => ({
 
 vi.mock("../../../../src/lib/db", () => ({
   getClientById: mockGetClientById,
+  writeNotificationLog: mockWriteNotificationLog,
 }));
 
 vi.mock("../../../../src/lib/analytics", () => ({
@@ -42,6 +44,7 @@ vi.mock("../../../../src/utils/logger", () => ({
 
 import { InngestTestEngine, mockCtx } from "@inngest/test";
 import { sendAnalyticsReport } from "../../../../src/inngest/functions/analytics-report";
+import { config } from "../../../../src/lib/config";
 import type {
   ClientRow,
   AnalyticsReport,
@@ -93,6 +96,15 @@ const mockEmailResult: EmailResult = {
   outcome: "logged",
 };
 
+const mockLiveEmailResult: EmailResult = {
+  mode: "live",
+  originalTo: "client@example.com",
+  actualTo: "client@example.com",
+  subject: "Your analytics report \u2014 Feb 16 \u2013 Feb 22, 2026",
+  outcome: "sent",
+  resendId: "resend-abc123",
+};
+
 const baseEvent = {
   name: "analytics/report.requested" as const,
   data: {
@@ -112,8 +124,18 @@ const t = new InngestTestEngine({
   transformCtx: (ctx: any) => mockCtx(ctx),
 });
 
+// Fresh engine per test — avoids @inngest/test step result caching between tests
+function freshEngine() {
+  return new InngestTestEngine({
+    function: sendAnalyticsReport,
+    events: [baseEvent],
+    transformCtx: (ctx: any) => mockCtx(ctx),
+  });
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
+  (config as any).emailMode = "mock"; // reset to default before each test
   mockGetClientById.mockResolvedValue(mockClient);
   mockGetAnalyticsReport.mockResolvedValue(mockReport);
   mockSendEmail.mockResolvedValue(mockEmailResult);
@@ -186,15 +208,7 @@ describe("fetch-client-config — failure", () => {
     expect((output.step.error as any)?.message).toBe("Client not found: client-1");
   });
 
-  it("throws when ga4_property_id is null", async () => {
-    mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
-
-    const output = await t.executeStep("fetch-client-config");
-
-    expect(output.step.op).toBe("StepError");
-    expect((output.step.error as any)?.message).toContain("GA4 property not configured");
-    expect((output.step.error as any)?.message).toContain("client-1");
-  });
+  // NOTE: null ga4_property_id is now handled by the check-ga4-config step, not here.
 });
 
 // ---------------------------------------------------------------------------
@@ -434,5 +448,102 @@ describe("full execute — happy path, last_week", () => {
         subject: expect.stringContaining("Feb 16 \u2013 Feb 22, 2026"),
       })
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T011: check-ga4-config step
+// ---------------------------------------------------------------------------
+
+describe("check-ga4-config — client has GA4 property", () => {
+  it("does not skip — function completes and sends email", async () => {
+    const { result } = await t.execute();
+
+    expect(result).toMatchObject({ clientId: "client-1", outcome: "logged" });
+    expect(mockSendEmail).toHaveBeenCalledOnce();
+    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
+  });
+});
+
+describe("check-ga4-config — client has no GA4 property, emailMode mock", () => {
+  it("returns skipped outcome and does not send email or write log", async () => {
+    mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
+
+    const { result } = await freshEngine().execute();
+
+    expect(result).toMatchObject({ clientId: "client-1", outcome: "skipped" });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
+  });
+});
+
+describe("check-ga4-config — client has no GA4 property, emailMode live", () => {
+  it("writes a skipped log record and does not send email", async () => {
+    (config as any).emailMode = "live";
+    mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
+
+    const { result } = await freshEngine().execute();
+
+    expect(result).toMatchObject({ clientId: "client-1", outcome: "skipped" });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
+    expect(mockWriteNotificationLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: "skipped",
+        error_message: "Client has no GA4 property configured",
+        client_id: "client-1",
+        workflow: "send-analytics-report",
+      })
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T008: log-result step — writeNotificationLog guard
+// ---------------------------------------------------------------------------
+
+describe("log-result — emailMode live", () => {
+  it("calls writeNotificationLog with correct fields and metadata", async () => {
+    (config as any).emailMode = "live";
+    mockSendEmail.mockResolvedValue(mockLiveEmailResult);
+
+    await freshEngine().execute();
+
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
+    expect(mockWriteNotificationLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client_id: "client-1",
+        workflow: "send-analytics-report",
+        event_name: "analytics/report.requested",
+        outcome: "sent",
+        recipient_email: "client@example.com",
+        subject: "Your analytics report \u2014 Feb 16 \u2013 Feb 22, 2026",
+        resend_id: "resend-abc123",
+        metadata: expect.objectContaining({
+          ga4_property_id: "123456789",
+          period_preset: "last_week",
+          date_range_start: "2026-02-16",
+          date_range_end: "2026-02-22",
+        }),
+      })
+    );
+  });
+});
+
+describe("log-result — emailMode mock", () => {
+  it("does not call writeNotificationLog", async () => {
+    await t.execute();
+
+    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
+  });
+});
+
+describe("log-result — emailMode test", () => {
+  it("does not call writeNotificationLog", async () => {
+    (config as any).emailMode = "test";
+
+    await t.execute();
+
+    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
   });
 });

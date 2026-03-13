@@ -2,7 +2,7 @@ import { Pool, neonConfig } from "@neondatabase/serverless";
 import type { QueryResult, QueryResultRow } from "@neondatabase/serverless";
 import ws from "ws";
 import { config } from "./config";
-import type { ClientRow } from "../types/index";
+import type { ClientRow, NotificationLogEntry } from "../types/index";
 
 // Required for Node.js — native WebSocket is not available until Node 22
 neonConfig.webSocketConstructor = ws;
@@ -71,6 +71,28 @@ export async function getAllActiveClients(options?: {
 
   const result = await query<ClientRow>(sql, values.length ? values : undefined);
   return result.rows;
+}
+
+export async function writeNotificationLog(
+  entry: NotificationLogEntry
+): Promise<void> {
+  await query(
+    `INSERT INTO notification_logs
+       (client_id, workflow, event_name, outcome,
+        recipient_email, subject, resend_id, error_message, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      entry.client_id,
+      entry.workflow,
+      entry.event_name,
+      entry.outcome,
+      entry.recipient_email,
+      entry.subject,
+      entry.resend_id ?? null,
+      entry.error_message ?? null,
+      JSON.stringify(entry.metadata),
+    ]
+  );
 }
 
 export async function checkDbConnection(): Promise<void> {
