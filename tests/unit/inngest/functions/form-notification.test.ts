@@ -3,6 +3,7 @@ import type { ClientRow, EmailResult } from "../../../../src/types/index";
 
 // Hoisted mock refs — declared before vi.mock() factories
 const mockRenderFormNotification = vi.hoisted(() => vi.fn());
+const mockWriteNotificationLog = vi.hoisted(() => vi.fn());
 
 // T006: Mock declarations — hoisted above all imports by Vitest
 // config MUST be first to prevent throw-at-import from buildConfig()
@@ -19,6 +20,7 @@ vi.mock("../../../../src/lib/config", () => ({
 
 vi.mock("../../../../src/lib/db", () => ({
   getClientById: vi.fn(),
+  writeNotificationLog: mockWriteNotificationLog,
 }));
 
 vi.mock("../../../../src/lib/email", () => ({
@@ -39,6 +41,7 @@ vi.mock("../../../../src/utils/logger", () => ({
 import { sendFormNotification } from "../../../../src/inngest/functions/form-notification";
 import { getClientById } from "../../../../src/lib/db";
 import { sendEmail } from "../../../../src/lib/email";
+import { config } from "../../../../src/lib/config";
 
 // ---------------------------------------------------------------------------
 // Fixture constants
@@ -73,6 +76,15 @@ const mockEmailResult: EmailResult = {
   outcome: "logged",
 };
 
+const mockLiveEmailResult: EmailResult = {
+  mode: "live",
+  originalTo: "owner@acme.com",
+  actualTo: "owner@acme.com",
+  subject: "New inquiry — Acme Corp",
+  outcome: "sent",
+  resendId: "resend-xyz789",
+};
+
 const mockRenderResult = {
   subject: "New inquiry — Acme Corp",
   html: "<html>mock</html>",
@@ -90,12 +102,23 @@ const t = new InngestTestEngine({
   transformCtx: (ctx: any) => mockCtx(ctx),
 });
 
+// Fresh engine per test — avoids @inngest/test step result caching between tests
+function freshEngine() {
+  return new InngestTestEngine({
+    function: sendFormNotification,
+    events: [validEvent],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    transformCtx: (ctx: any) => mockCtx(ctx),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // T007: Test cases
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
   vi.resetAllMocks();
+  (config as any).emailMode = "mock"; // reset to default before each test
   mockRenderFormNotification.mockResolvedValue(mockRenderResult);
 });
 
@@ -230,5 +253,58 @@ describe("full execute", () => {
       clientId: "client-acme",
       outcome: "logged",
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T009: log-result step — writeNotificationLog guard
+// ---------------------------------------------------------------------------
+
+describe("log-result — emailMode live", () => {
+  it("calls writeNotificationLog with correct fields and formData metadata", async () => {
+    (config as any).emailMode = "live";
+    vi.mocked(getClientById).mockResolvedValue(mockClient);
+    vi.mocked(sendEmail).mockResolvedValue(mockLiveEmailResult);
+
+    await freshEngine().execute();
+
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
+    expect(mockWriteNotificationLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client_id: "client-acme",
+        workflow: "send-form-notification",
+        event_name: "form/submitted",
+        outcome: "sent",
+        recipient_email: "owner@acme.com",
+        subject: "New inquiry — Acme Corp",
+        resend_id: "resend-xyz789",
+        metadata: expect.objectContaining({
+          formData: expect.objectContaining({ submitterName: "Jane Smith" }),
+        }),
+      })
+    );
+  });
+});
+
+describe("log-result — emailMode mock", () => {
+  it("does not call writeNotificationLog", async () => {
+    vi.mocked(getClientById).mockResolvedValue(mockClient);
+    vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
+
+    await t.execute();
+
+    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
+  });
+});
+
+describe("log-result — emailMode test", () => {
+  it("does not call writeNotificationLog", async () => {
+    (config as any).emailMode = "test";
+    vi.mocked(getClientById).mockResolvedValue(mockClient);
+    vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
+
+    await t.execute();
+
+    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import { inngest } from "../client";
 import { config } from "../../lib/config";
-import { getClientById } from "../../lib/db";
+import { getClientById, writeNotificationLog } from "../../lib/db";
 import { getAnalyticsReport } from "../../lib/analytics";
 import { sendEmail } from "../../lib/email";
 import { renderAnalyticsReportEmail } from "../../lib/templates";
@@ -113,12 +113,31 @@ export const sendAnalyticsReport = inngest.createFunction(
     });
 
     const client = await step.run("fetch-client-config", async () => {
-      const c = await getClientById(clientId);
-      if (!c.ga4_property_id) {
-        throw new Error(`GA4 property not configured: ${clientId}`);
-      }
-      return c;
+      return getClientById(clientId);
     });
+
+    const skipped = await step.run("check-ga4-config", async () => {
+      if (!client.ga4_property_id) {
+        if (config.emailMode === "live") {
+          await writeNotificationLog({
+            client_id: clientId,
+            workflow: "send-analytics-report",
+            event_name: "analytics/report.requested",
+            outcome: "skipped",
+            recipient_email: client.email,
+            subject: "Weekly Analytics Report",
+            error_message: "Client has no GA4 property configured",
+            metadata: {},
+          });
+        }
+        return true;
+      }
+      return false;
+    });
+
+    if (skipped) {
+      return { clientId, outcome: "skipped" };
+    }
 
     const resolvedPeriod = await step.run("resolve-report-period", async () => {
       return resolvePeriod(data.reportPeriod, data.scheduledAt);
@@ -137,8 +156,6 @@ export const sendAnalyticsReport = inngest.createFunction(
         topPagesLimit: data.topPagesLimit,
       });
     });
-
-    log("Hello World, I'm here!");
 
     const result = await step.run("send-email", async () => {
       const rendered = await renderAnalyticsReportEmail(report, client, resolvedPeriod);
@@ -160,6 +177,23 @@ export const sendAnalyticsReport = inngest.createFunction(
         originalTo: result.originalTo,
         isMock: report.isMock,
       } as any);
+      if (config.emailMode === "live") {
+        await writeNotificationLog({
+          client_id: clientId,
+          workflow: "send-analytics-report",
+          event_name: "analytics/report.requested",
+          outcome: result.outcome === "sent" ? "sent" : "failed",
+          recipient_email: result.originalTo,
+          subject: result.subject,
+          resend_id: result.resendId,
+          metadata: {
+            ga4_property_id: client.ga4_property_id,
+            period_preset: data.reportPeriod.preset,
+            date_range_start: resolvedPeriod.start,
+            date_range_end: resolvedPeriod.end,
+          },
+        });
+      }
     });
 
     return {

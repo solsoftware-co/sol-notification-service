@@ -1,6 +1,6 @@
 import { inngest } from "../client";
 import { config } from "../../lib/config";
-import { getClientById } from "../../lib/db";
+import { getClientById, writeNotificationLog } from "../../lib/db";
 import { sendEmail } from "../../lib/email";
 import { renderFormNotificationEmail } from "../../lib/templates";
 import { log, logError } from "../../utils/logger";
@@ -54,6 +54,18 @@ export const sendFormNotification = inngest.createFunction(
         outcome: result.outcome,
         originalTo: result.originalTo,
       });
+      if (config.emailMode === "live") {
+        await writeNotificationLog({
+          client_id: clientId,
+          workflow: "send-form-notification",
+          event_name: "form/submitted",
+          outcome: result.outcome === "sent" ? "sent" : "failed",
+          recipient_email: result.originalTo,
+          subject: result.subject,
+          resend_id: result.resendId,
+          metadata: { formData: data },
+        });
+      }
     });
 
     return { clientId, outcome: result.outcome };
