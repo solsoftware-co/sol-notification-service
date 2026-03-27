@@ -40,10 +40,10 @@ async function generateAreaChart(
           {
             data: values,
             fill: true,
-            borderColor: colors.accent,
-            backgroundColor: colors.accentShading,
+            borderColor: colors.border,
+            backgroundColor: colors.shading,
             pointRadius: 4,
-            pointBackgroundColor: colors.accent,
+            pointBackgroundColor: colors.border,
             tension: 0.3,
             borderWidth: 2,
           },
@@ -57,7 +57,7 @@ async function generateAreaChart(
             align: 'top',
             color: colors.textSecondary,
             font: { size: 10 },
-            formatter: 'function(value) { return value.toLocaleString("en-US"); }',
+            formatter: 'function(value) { var p = Math.round(value).toString().split(""); var o = ""; for (var i = 0; i < p.length; i++) { if (i > 0 && (p.length - i) % 3 === 0) o += ","; o += p[i]; } return o; }',
           },
         },
         scales: {
@@ -66,8 +66,7 @@ async function generateAreaChart(
             grid: { display: false },
           },
           y: {
-            ticks: { color: colors.textMuted, font: { size: 11 } },
-            grid: { display: false },
+            display: false,
           },
         },
       },
@@ -91,7 +90,9 @@ async function generateBarChart(
         datasets: [
           {
             data: values,
-            backgroundColor: colors.accent,
+            backgroundColor: colors.bg,
+            borderColor: colors.border,
+            borderWidth: 1,
             borderRadius: 4,
           },
         ],
@@ -105,16 +106,18 @@ async function generateBarChart(
             align: 'end',
             color: colors.textSecondary,
             font: { size: 10 },
-            formatter: 'function(value) { return value.toLocaleString("en-US"); }',
+            formatter: 'function(value) { var p = Math.round(value).toString().split(""); var o = ""; for (var i = 0; i < p.length; i++) { if (i > 0 && (p.length - i) % 3 === 0) o += ","; o += p[i]; } return o; }',
           },
         },
         scales: {
           x: {
-            ticks: { color: colors.textMuted, font: { size: 11 } },
+            display: isHorizontal ? false : true,
+            ticks: { color: colors.textPrimary, font: { size: 11 } },
             grid: { display: false },
           },
           y: {
-            ticks: { color: colors.textSecondary, font: { size: 11 } },
+            display: isHorizontal ? true : false,
+            ticks: { color: colors.textPrimary, font: { size: 11 } },
             grid: { display: false },
           },
         },
