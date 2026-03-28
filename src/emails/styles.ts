@@ -18,7 +18,7 @@ export const colors = {
 export const typography = {
   fontStack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
   sizes: {
-    display: '52px',
+    display: '36px',
     h1:      '28px',
     h2:      '18px',
     body:    '15px',

@@ -9,6 +9,7 @@ import {
   generateTopPagesChart,
 } from './charts';
 import { log } from '../utils/logger';
+import type { ReportPeriodPreset } from '../types/index';
 import type {
   FormSubmittedPayload,
   ClientRow,
@@ -18,6 +19,50 @@ import type {
   ResolvedPeriod,
 } from '../types/index';
 import type { StatMetric } from '../emails/templates/analytics-report-v1';
+
+function shortDate(isoDate: string): string {
+  const [, mm, dd] = isoDate.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(mm) - 1]} ${parseInt(dd)}`;
+}
+
+function computeChange(current: number, priors: number[]): { pct: number; direction: 'up' | 'down' | 'neutral' } {
+  if (priors.length === 0) return { pct: 0, direction: 'neutral' };
+  const avg = priors.reduce((s, v) => s + v, 0) / priors.length;
+  if (avg === 0) return { pct: 0, direction: 'neutral' };
+  const ratio = (current - avg) / avg;
+  return {
+    pct: Math.round(Math.abs(ratio) * 100),
+    direction: ratio > 0.01 ? 'up' : ratio < -0.01 ? 'down' : 'neutral',
+  };
+}
+
+function buildChangePhrase(
+  metricKey: 'sessions' | 'activeUsers' | 'newUsers' | 'avgDuration',
+  pct: number,
+  direction: 'up' | 'down' | 'neutral',
+): string {
+  if (direction === 'neutral') {
+    const noun = metricKey === 'sessions' ? 'sessions' :
+                 metricKey === 'activeUsers' ? 'active users' :
+                 metricKey === 'newUsers' ? 'new users' : 'session duration';
+    return `consistent ${noun}`;
+  }
+  switch (metricKey) {
+    case 'sessions':    return `${pct}% ${direction === 'up' ? 'more' : 'fewer'} sessions`;
+    case 'activeUsers': return `${pct}% ${direction === 'up' ? 'more' : 'fewer'} active users`;
+    case 'newUsers':    return `${pct}% ${direction === 'up' ? 'more' : 'fewer'} new users`;
+    case 'avgDuration': return `${pct}% ${direction === 'up' ? 'longer' : 'shorter'} average sessions`;
+  }
+}
+
+function buildComparisonLabel(preset: ReportPeriodPreset, count: number): string {
+  const unit = preset === 'last_week'    ? 'week' :
+               preset === 'last_month'   ? 'month' :
+               preset === 'last_30_days' ? '30-day period' :
+               preset === 'last_90_days' ? '90-day period' : 'period';
+  return count === 1 ? `the previous ${unit}` : `the previous ${count} ${unit}s`;
+}
 
 async function loadBannerAttachment(): Promise<EmailAttachment> {
   const content = await readFile(path.join(process.cwd(), 'assets', 'banner_image.png'));
@@ -86,26 +131,41 @@ export async function renderAnalyticsReportEmail(
   const subject = `Your analytics report — ${period.label}`;
   const previewText = `${client.name} — ${period.label}: ${report.sessions.toLocaleString()} sessions`;
 
-  const sessions: StatMetric = {
-    value: report.sessions.toLocaleString(),
-    label: 'SESSIONS',
-    description: `Total sessions — ${period.label}`,
-  };
-  const avgDuration: StatMetric = {
-    value: formatDuration(report.avgSessionDurationSecs),
-    label: 'AVG DURATION',
-    description: 'Average session duration',
-  };
-  const activeUsers: StatMetric = {
-    value: report.activeUsers.toLocaleString(),
-    label: 'ACTIVE USERS',
-    description: `Active users — ${period.label}`,
-  };
-  const newUsers: StatMetric = {
-    value: report.newUsers.toLocaleString(),
-    label: 'NEW USERS',
-    description: `New users — ${period.label}`,
-  };
+  const hp = report.historicalPeriods ?? [];
+  const compLabel = hp.length > 0 ? buildComparisonLabel(period.preset, hp.length) : undefined;
+  const currentBarLabel = shortDate(period.start);
+
+  function buildMetric(
+    metricKey: 'sessions' | 'activeUsers' | 'newUsers' | 'avgDuration',
+    label: string,
+    currentVal: number,
+    formattedValue: string,
+  ): StatMetric {
+    if (hp.length === 0) return { value: formattedValue, label };
+    const priorVals = hp.map(h =>
+      metricKey === 'sessions'    ? h.sessions :
+      metricKey === 'activeUsers' ? h.activeUsers :
+      metricKey === 'newUsers'    ? h.newUsers : h.avgSessionDurationSecs
+    );
+    const { pct, direction } = computeChange(currentVal, priorVals);
+    return {
+      value: formattedValue,
+      label,
+      changePhrase: buildChangePhrase(metricKey, pct, direction),
+      changeDirection: direction,
+      periodLabel: period.label,
+      comparisonLabel: compLabel,
+      bars: [
+        ...hp.map(h => ({ label: h.periodLabel, value: priorVals[hp.indexOf(h)], isCurrent: false })),
+        { label: currentBarLabel, value: currentVal, isCurrent: true },
+      ],
+    };
+  }
+
+  const sessions   = buildMetric('sessions',    'SESSIONS',     report.sessions,               report.sessions.toLocaleString());
+  const avgDuration = buildMetric('avgDuration', 'AVG DURATION', report.avgSessionDurationSecs, formatDuration(report.avgSessionDurationSecs));
+  const activeUsers = buildMetric('activeUsers', 'ACTIVE USERS', report.activeUsers,            report.activeUsers.toLocaleString());
+  const newUsers    = buildMetric('newUsers',    'NEW USERS',    report.newUsers,               report.newUsers.toLocaleString());
 
   // Generate charts independently — each fails gracefully without blocking the others
   let dailyChartBuf: Buffer | null = null;

@@ -42,7 +42,7 @@ async function generateAreaChart(
             fill: true,
             borderColor: colors.border,
             backgroundColor: colors.shading,
-            pointRadius: 4,
+            pointRadius: 2,
             pointBackgroundColor: colors.border,
             tension: 0.3,
             borderWidth: 2,
@@ -50,6 +50,7 @@ async function generateAreaChart(
         ],
       },
       options: {
+        layout: { padding: { top: 24 } },
         plugins: {
           legend: { display: false },
           datalabels: {

@@ -8,6 +8,7 @@ import type {
   TopPage,
   TrafficSource,
   DailyMetric,
+  HistoricalPeriodSnapshot,
 } from "../types/index";
 
 // Default row limits per reporting preset.
@@ -144,6 +145,51 @@ function dimVal(
   return response.rows?.[rowIndex]?.dimensionValues?.[dimIndex]?.value ?? "";
 }
 
+function formatShortLabel(date: Date): string {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+function computePriorPeriods(period: ResolvedPeriod, count: number): Array<{ start: string; end: string; label: string }> {
+  const currentStart = new Date(period.start + 'T00:00:00Z');
+  const currentEnd = new Date(period.end + 'T00:00:00Z');
+  const durationDays = Math.round((currentEnd.getTime() - currentStart.getTime()) / 86400000) + 1;
+  const result: Array<{ start: string; end: string; label: string }> = [];
+  for (let i = count; i >= 1; i--) {
+    const priorEndMs = currentStart.getTime() - ((i - 1) * durationDays + 1) * 86400000;
+    const priorStartMs = priorEndMs - (durationDays - 1) * 86400000;
+    const priorStart = new Date(priorStartMs);
+    const priorEnd = new Date(priorEndMs);
+    result.push({
+      start: priorStart.toISOString().slice(0, 10),
+      end: priorEnd.toISOString().slice(0, 10),
+      label: formatShortLabel(priorStart),
+    });
+  }
+  return result;
+}
+
+async function getPeriodTotals(
+  propertyId: string,
+  start: string,
+  end: string,
+): Promise<{ sessions: number; activeUsers: number; newUsers: number; avgSessionDurationSecs: number }> {
+  const [totalsRes, durationRes] = await Promise.all([
+    runReport({
+      propertyId,
+      startDate: start,
+      endDate: end,
+      metrics: [{ name: 'sessions' }, { name: 'activeUsers' }, { name: 'newUsers' }],
+    }),
+    getAverageSessionDuration(propertyId, start, end),
+  ]);
+  return {
+    sessions: Math.round(metricVal(totalsRes, 0, 0)),
+    activeUsers: Math.round(metricVal(totalsRes, 0, 1)),
+    newUsers: Math.round(metricVal(totalsRes, 0, 2)),
+    avgSessionDurationSecs: Math.round(metricVal(durationRes, 0, 0)),
+  };
+}
+
 function mockReport(period: ResolvedPeriod): AnalyticsReport {
   return {
     sessions: 42,
@@ -165,6 +211,11 @@ function mockReport(period: ResolvedPeriod): AnalyticsReport {
     ],
     resolvedPeriod: period,
     isMock: true,
+    historicalPeriods: [
+      { periodLabel: 'Feb 2',  sessions: 35, activeUsers: 26, newUsers: 14, avgSessionDurationSecs: 142 },
+      { periodLabel: 'Feb 9',  sessions: 48, activeUsers: 35, newUsers: 21, avgSessionDurationSecs: 138 },
+      { periodLabel: 'Feb 16', sessions: 39, activeUsers: 29, newUsers: 16, avgSessionDurationSecs: 161 },
+    ],
   };
 }
 
@@ -227,6 +278,14 @@ export async function getAnalyticsReport(
     views: Math.round(metricVal(pagesData, i, 0)),
   }));
 
+  const priorPeriodDefs = computePriorPeriods(period, 3);
+  const priorResults = await Promise.all(
+    priorPeriodDefs.map(p => getPeriodTotals(propertyId, p.start, p.end).catch(() => null))
+  );
+  const historicalPeriods: HistoricalPeriodSnapshot[] = priorPeriodDefs
+    .map((def, i) => priorResults[i] ? { periodLabel: def.label, ...priorResults[i]! } : null)
+    .filter((h): h is HistoricalPeriodSnapshot => h !== null);
+
   return {
     sessions,
     activeUsers,
@@ -237,5 +296,6 @@ export async function getAnalyticsReport(
     dailyMetrics,
     resolvedPeriod: period,
     isMock: false,
+    historicalPeriods,
   };
 }
