@@ -4,7 +4,8 @@ import { LabelText } from './label-text';
 
 export type StatMetric = {
     value: string;
-    label: string;
+    label: string;       // friendly label shown top-left, e.g. "Website Visits"
+    sublabel: string;    // descriptor shown under the number, e.g. "Sessions"
     // Optional historical context — card falls back to simple display if absent
     changePhrase?: string;      // e.g. "10% more sessions" (the bolded highlight)
     changeDirection?: 'up' | 'down' | 'neutral';
@@ -38,8 +39,8 @@ export function StatCard({ metric }: StatCardProps) {
                 <tr>
                     {/* Left column: label + description */}
                     <td style={{ verticalAlign: 'middle', paddingRight: '40px', width: '55%' }}>
-                        <LabelText>{metric.label}</LabelText>
-                        {hasHistory && metric.periodLabel && metric.comparisonLabel ? (
+                        <LabelText style={{ margin: '0 0 12px 0' }}>{metric.label}</LabelText>
+                        {hasHistory && metric.periodLabel && metric.comparisonLabel && (
                             <Text style={{
                                 fontFamily: typography.fontStack,
                                 fontSize: typography.sizes.small,
@@ -54,17 +55,6 @@ export function StatCard({ metric }: StatCardProps) {
                                     <>You had <strong>{metric.changePhrase}</strong> for <strong>{metric.periodLabel}</strong>, compared to {metric.comparisonLabel}.</>
                                 )}
                             </Text>
-                        ) : (
-                            <Text style={{
-                                fontFamily: typography.fontStack,
-                                fontSize: typography.sizes.small,
-                                fontWeight: typography.weights.regular,
-                                color: colors.textSecondary,
-                                lineHeight: typography.lineHeights.small,
-                                margin: '0',
-                            }}>
-                                {metric.label.charAt(0) + metric.label.slice(1).toLowerCase()}
-                            </Text>
                         )}
                     </td>
 
@@ -73,14 +63,25 @@ export function StatCard({ metric }: StatCardProps) {
                         <Text style={{
                             fontFamily: typography.fontStack,
                             fontSize: typography.sizes.display,
-                            fontWeight: typography.weights.light,
+                            fontWeight: typography.weights.regular,
                             color: colors.textPrimary,
                             lineHeight: typography.lineHeights.tight,
                             letterSpacing: typography.letterSpacing.tight,
-                            margin: '0 0 24px 0',
+                            margin: '0 0 4px 0',
                             textAlign: 'right',
                         }}>
                             {metric.value}
+                        </Text>
+                        <Text style={{
+                            fontFamily: typography.fontStack,
+                            fontSize: typography.sizes.small,
+                            fontWeight: typography.weights.regular,
+                            color: colors.textMuted,
+                            lineHeight: typography.lineHeights.small,
+                            textAlign: 'right',
+                            margin: '0 0 20px 0',
+                        }}>
+                            {metric.sublabel}
                         </Text>
 
                         {hasHistory && (

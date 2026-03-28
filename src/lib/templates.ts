@@ -138,10 +138,11 @@ export async function renderAnalyticsReportEmail(
   function buildMetric(
     metricKey: 'sessions' | 'activeUsers' | 'newUsers' | 'avgDuration',
     label: string,
+    sublabel: string,
     currentVal: number,
     formattedValue: string,
   ): StatMetric {
-    if (hp.length === 0) return { value: formattedValue, label };
+    if (hp.length === 0) return { value: formattedValue, label, sublabel };
     const priorVals = hp.map(h =>
       metricKey === 'sessions'    ? h.sessions :
       metricKey === 'activeUsers' ? h.activeUsers :
@@ -151,6 +152,7 @@ export async function renderAnalyticsReportEmail(
     return {
       value: formattedValue,
       label,
+      sublabel,
       changePhrase: buildChangePhrase(metricKey, pct, direction),
       changeDirection: direction,
       periodLabel: period.label,
@@ -162,10 +164,10 @@ export async function renderAnalyticsReportEmail(
     };
   }
 
-  const sessions   = buildMetric('sessions',    'SESSIONS',     report.sessions,               report.sessions.toLocaleString());
-  const avgDuration = buildMetric('avgDuration', 'AVG DURATION', report.avgSessionDurationSecs, formatDuration(report.avgSessionDurationSecs));
-  const activeUsers = buildMetric('activeUsers', 'ACTIVE USERS', report.activeUsers,            report.activeUsers.toLocaleString());
-  const newUsers    = buildMetric('newUsers',    'NEW USERS',    report.newUsers,               report.newUsers.toLocaleString());
+  const sessions    = buildMetric('sessions',    'Website Visits',      'Sessions',     report.sessions,               report.sessions.toLocaleString());
+  const avgDuration = buildMetric('avgDuration', 'Avg. Time on Site',   'Avg. Duration', report.avgSessionDurationSecs, formatDuration(report.avgSessionDurationSecs));
+  const activeUsers = buildMetric('activeUsers', 'Total Visitors',      'Active Users', report.activeUsers,            report.activeUsers.toLocaleString());
+  const newUsers    = buildMetric('newUsers',    'First-Time Visitors', 'New Users',    report.newUsers,               report.newUsers.toLocaleString());
 
   // Generate charts independently — each fails gracefully without blocking the others
   let dailyChartBuf: Buffer | null = null;
