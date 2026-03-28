@@ -91,7 +91,7 @@ export function StatCard({ metric }: StatCardProps) {
                                         const barHeight = Math.max(BAR_MIN_HEIGHT, Math.round((bar.value / maxBarVal) * CHART_HEIGHT));
                                         const spacerHeight = CHART_HEIGHT - barHeight;
                                         return (
-                                            <td key={i} style={{ verticalAlign: 'bottom', textAlign: 'center', padding: '0 14px', width: '25%' }}>
+                                            <td key={i} style={{ verticalAlign: 'bottom', textAlign: 'center', padding: '0 12px', width: '25%' }}>
                                                 <table role="presentation" width="100%" cellPadding="0" cellSpacing="0">
                                                     <tr>
                                                         <td style={{ height: `${spacerHeight}px`, fontSize: '0', lineHeight: '0' }}>&nbsp;</td>
