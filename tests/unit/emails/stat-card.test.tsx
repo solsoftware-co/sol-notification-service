@@ -115,7 +115,7 @@ describe('StatCard', () => {
 
     it('renders an upward trend arrow (↑) coloured with the positive token', () => {
       expect(html).toContain('↑');
-      expect(html).toContain('#F7BC03'); // colors.positive
+      expect(html).toContain('#3A6EA5'); // colors.positive
     });
   });
 
@@ -205,7 +205,7 @@ describe('StatCard', () => {
 
     it('renders a downward trend arrow (↓) coloured with the negative token', () => {
       expect(html).toContain('↓');
-      expect(html).toContain('#C97B7B'); // colors.negative
+      expect(html).toContain('#C04000'); // colors.negative
     });
   });
 
