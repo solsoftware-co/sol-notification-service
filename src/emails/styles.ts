@@ -12,13 +12,14 @@ export const colors = {
   textMuted:     '#A1A1AA',  // footer, field labels, metadata
   accent:        '#3A6EA5',  // links, CTA buttons, message-block left border
   accentShading: 'rgba(94,150,199,0.15)',
-  positive:      '#F7BC03',  // upward trend indicators
+  positive:      '#3A6EA5',  // upward trend indicators
+  negative:      '#C04000',  // downward trend indicators (soft rose, not aggressive red)
 } as const;
 
 export const typography = {
   fontStack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
   sizes: {
-    display: '36px',
+    display: '30px',
     h1:      '28px',
     h2:      '18px',
     body:    '15px',

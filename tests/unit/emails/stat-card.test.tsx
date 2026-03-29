@@ -84,6 +84,12 @@ describe('StatCard', () => {
       expect(html).not.toContain('You had');
       expect(html).not.toContain('was consistent for');
     });
+
+    it('renders no trend arrow when there is no historical data', () => {
+      expect(html).not.toContain('↑');
+      expect(html).not.toContain('↓');
+      expect(html).not.toContain('→');
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -105,6 +111,11 @@ describe('StatCard', () => {
 
     it('current bar has the darker colour', () => {
       expect(html).toContain('#71717A');
+    });
+
+    it('renders an upward trend arrow (↑) coloured with the positive token', () => {
+      expect(html).toContain('↑');
+      expect(html).toContain('#F7BC03'); // colors.positive
     });
   });
 
@@ -191,6 +202,11 @@ describe('StatCard', () => {
     it('change phrase is rendered in bold', () => {
       expect(html).toContain('<strong>15% fewer sessions</strong>');
     });
+
+    it('renders a downward trend arrow (↓) coloured with the negative token', () => {
+      expect(html).toContain('↓');
+      expect(html).toContain('#C97B7B'); // colors.negative
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -217,6 +233,11 @@ describe('StatCard', () => {
 
     it('still bolds the period label', () => {
       expect(html).toContain('<strong>Feb 23 – Mar 1</strong>');
+    });
+
+    it('renders a neutral trend arrow (→) coloured with the muted token', () => {
+      expect(html).toContain('→');
+      expect(html).toContain('#A1A1AA'); // colors.textMuted
     });
   });
 

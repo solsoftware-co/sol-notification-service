@@ -39,7 +39,22 @@ export function StatCard({ metric }: StatCardProps) {
                 <tr>
                     {/* Left column: label + description */}
                     <td style={{ verticalAlign: 'middle', paddingRight: '40px', width: '55%' }}>
-                        <LabelText style={{ margin: '0 0 12px 0' }}>{metric.label}</LabelText>
+                        <LabelText style={{ margin: '0 0 12px 0' }}>
+                            {metric.label}
+                            {hasHistory && metric.changeDirection && (
+                                <span style={{
+                                    marginLeft: '5px',
+                                    color: metric.changeDirection === 'up'   ? colors.positive
+                                         : metric.changeDirection === 'down' ? colors.negative
+                                         : colors.textMuted,
+                                    fontWeight: typography.weights.regular,
+                                    letterSpacing: 'normal',
+                                    textTransform: 'none',
+                                }}>
+                                    {metric.changeDirection === 'up' ? '↑' : metric.changeDirection === 'down' ? '↓' : '→'}
+                                </span>
+                            )}
+                        </LabelText>
                         {hasHistory && metric.periodLabel && metric.comparisonLabel && (
                             <Text style={{
                                 fontFamily: typography.fontStack,
@@ -79,7 +94,7 @@ export function StatCard({ metric }: StatCardProps) {
                             color: colors.textMuted,
                             lineHeight: typography.lineHeights.small,
                             textAlign: 'right',
-                            margin: '0 0 20px 0',
+                            margin: '0 0 28px 0',
                         }}>
                             {metric.sublabel}
                         </Text>
