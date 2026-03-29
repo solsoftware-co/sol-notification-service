@@ -98,10 +98,10 @@ describe('generateDailyTrendChart', () => {
     expect(chart.data.datasets[0].fill).toBe(true);
   });
 
-  it('uses brand accent colour for borderColor', async () => {
+  it('uses border colour for borderColor (muted line style)', async () => {
     await generateDailyTrendChart(dailyMetrics);
     const chart = captureChartConfig() as any;
-    expect(chart.data.datasets[0].borderColor).toBe(colors.accent);
+    expect(chart.data.datasets[0].borderColor).toBe(colors.border);
   });
 
   it('passes backgroundColor: colors.surface in the QuickChart request body', async () => {
@@ -173,10 +173,10 @@ describe('generateTopSourcesChart', () => {
     expect(chart.data.datasets[0].data[0]).toBe(4820);
   });
 
-  it('uses brand accent colour for backgroundColor', async () => {
+  it('uses bg colour for backgroundColor (muted bar style)', async () => {
     await generateTopSourcesChart(sources);
     const chart = captureChartConfig() as any;
-    expect(chart.data.datasets[0].backgroundColor).toBe(colors.accent);
+    expect(chart.data.datasets[0].backgroundColor).toBe(colors.bg);
   });
 
   it('passes backgroundColor: colors.surface in the QuickChart request body', async () => {

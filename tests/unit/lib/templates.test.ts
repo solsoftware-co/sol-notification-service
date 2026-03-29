@@ -263,3 +263,263 @@ describe('renderAnalyticsReportEmail', () => {
     expect(props.dailyMetrics[0].date).toBe('02/01/2026');
   });
 });
+
+// ---------------------------------------------------------------------------
+// renderAnalyticsReportEmail — historical metric building
+// ---------------------------------------------------------------------------
+// Verifies that buildMetric() correctly derives bars, changePhrase,
+// changeDirection, periodLabel, and comparisonLabel from historicalPeriods.
+// Assertions inspect the props passed directly to AnalyticsReportV1Email.
+// ---------------------------------------------------------------------------
+
+describe('renderAnalyticsReportEmail — historical metric building', () => {
+  // Shared prior-period data — 3 weeks of increasing traffic
+  const threePriors = [
+    { periodLabel: 'Jan 26', sessions: 3000, activeUsers: 2000, newUsers: 400, avgSessionDurationSecs: 160 },
+    { periodLabel: 'Feb 2',  sessions: 3500, activeUsers: 2400, newUsers: 450, avgSessionDurationSecs: 165 },
+    { periodLabel: 'Feb 9',  sessions: 4000, activeUsers: 2800, newUsers: 500, avgSessionDurationSecs: 170 },
+  ];
+
+  // ---------------------------------------------------------------------------
+  describe('no historical data — fallback mode', () => {
+    it('sessions metric has no bars when historicalPeriods is absent', async () => {
+      await renderAnalyticsReportEmail({ ...mockReport, historicalPeriods: undefined }, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.bars).toBeUndefined();
+      expect(props.sessions.changePhrase).toBeUndefined();
+    });
+
+    it('sessions metric still carries value, label, and sublabel', async () => {
+      await renderAnalyticsReportEmail({ ...mockReport, historicalPeriods: undefined }, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.value).toBe('4,820');
+      expect(props.sessions.label).toBe('Website Visits');
+      expect(props.sessions.sublabel).toBe('Sessions');
+    });
+
+    it('empty historicalPeriods array also triggers fallback', async () => {
+      await renderAnalyticsReportEmail({ ...mockReport, historicalPeriods: [] }, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.bars).toBeUndefined();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('1 prior period', () => {
+    it('sessions metric has exactly 2 bars (1 prior + 1 current)', async () => {
+      const report = { ...mockReport, historicalPeriods: [threePriors[2]] }; // Feb 9 only
+      await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.bars).toHaveLength(2);
+      expect(props.sessions.bars[0].isCurrent).toBe(false);
+      expect(props.sessions.bars[1].isCurrent).toBe(true);
+    });
+
+    it('comparisonLabel uses singular "the previous week" for last_week preset', async () => {
+      const report = { ...mockReport, historicalPeriods: [threePriors[2]] };
+      await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.comparisonLabel).toBe('the previous week');
+    });
+
+    it('prior bar carries the periodLabel from historicalPeriods', async () => {
+      const report = { ...mockReport, historicalPeriods: [threePriors[2]] };
+      await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.bars[0].label).toBe('Feb 9');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('2 prior periods', () => {
+    it('sessions metric has exactly 3 bars (2 prior + 1 current)', async () => {
+      const report = { ...mockReport, historicalPeriods: threePriors.slice(1) }; // Feb 2, Feb 9
+      await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.bars).toHaveLength(3);
+    });
+
+    it('comparisonLabel uses "the previous 2 weeks" for last_week preset', async () => {
+      const report = { ...mockReport, historicalPeriods: threePriors.slice(1) };
+      await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.comparisonLabel).toBe('the previous 2 weeks');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('3 prior periods — upward trend', () => {
+    // avg sessions = (3000+3500+4000)/3 = 3500, current = 4820
+    // ratio ≈ 0.377 → 38% up
+    const reportWith3 = { ...mockReport, historicalPeriods: threePriors };
+
+    it('sessions metric has exactly 4 bars (3 prior + 1 current)', async () => {
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.bars).toHaveLength(4);
+    });
+
+    it('current bar is last and marked isCurrent:true', async () => {
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      const bars = props.sessions.bars;
+      expect(bars[bars.length - 1].isCurrent).toBe(true);
+      bars.slice(0, -1).forEach((b: any) => expect(b.isCurrent).toBe(false));
+    });
+
+    it('changeDirection is "up"', async () => {
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.changeDirection).toBe('up');
+    });
+
+    it('changePhrase contains "more sessions"', async () => {
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.changePhrase).toMatch(/more sessions$/);
+    });
+
+    it('comparisonLabel is "the previous 3 weeks" for last_week preset', async () => {
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.comparisonLabel).toBe('the previous 3 weeks');
+    });
+
+    it('periodLabel matches the period label string', async () => {
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.periodLabel).toBe('Feb 16 – Feb 22, 2026');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('3 prior periods — downward trend', () => {
+    // sessions current = 2000, avg = 3500 → 43% down
+    const reportDown = {
+      ...mockReport,
+      sessions: 2000,
+      historicalPeriods: threePriors,
+    };
+
+    it('changeDirection is "down"', async () => {
+      await renderAnalyticsReportEmail(reportDown, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.changeDirection).toBe('down');
+    });
+
+    it('changePhrase contains "fewer sessions"', async () => {
+      await renderAnalyticsReportEmail(reportDown, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.changePhrase).toMatch(/fewer sessions$/);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('3 prior periods — neutral trend', () => {
+    // ratio = 35/3500 = 0.01 exactly → not > 0.01, so neutral
+    const reportNeutral = {
+      ...mockReport,
+      sessions: 3535,
+      historicalPeriods: [
+        { periodLabel: 'Jan 26', sessions: 3500, activeUsers: 2000, newUsers: 400, avgSessionDurationSecs: 160 },
+        { periodLabel: 'Feb 2',  sessions: 3500, activeUsers: 2400, newUsers: 450, avgSessionDurationSecs: 165 },
+        { periodLabel: 'Feb 9',  sessions: 3500, activeUsers: 2800, newUsers: 500, avgSessionDurationSecs: 170 },
+      ],
+    };
+
+    it('changeDirection is "neutral"', async () => {
+      await renderAnalyticsReportEmail(reportNeutral, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.changeDirection).toBe('neutral');
+    });
+
+    it('changePhrase uses "consistent sessions" for neutral direction', async () => {
+      await renderAnalyticsReportEmail(reportNeutral, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.changePhrase).toBe('consistent sessions');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('preset-based comparisonLabel wording', () => {
+    const report3 = { ...mockReport, historicalPeriods: threePriors };
+
+    it('last_month + 3 periods → "the previous 3 months"', async () => {
+      const monthPeriod: ResolvedPeriod = { ...mockPeriod, preset: 'last_month' };
+      await renderAnalyticsReportEmail(report3, mockClient, monthPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.comparisonLabel).toBe('the previous 3 months');
+    });
+
+    it('last_30_days + 1 period → "the previous 30-day period"', async () => {
+      const thirtyPeriod: ResolvedPeriod = { ...mockPeriod, preset: 'last_30_days' };
+      const report1 = { ...mockReport, historicalPeriods: [threePriors[0]] };
+      await renderAnalyticsReportEmail(report1, mockClient, thirtyPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.comparisonLabel).toBe('the previous 30-day period');
+    });
+
+    it('last_30_days + 3 periods → "the previous 3 30-day periods"', async () => {
+      const thirtyPeriod: ResolvedPeriod = { ...mockPeriod, preset: 'last_30_days' };
+      await renderAnalyticsReportEmail(report3, mockClient, thirtyPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.comparisonLabel).toBe('the previous 3 30-day periods');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('metric-specific labels, sublabels, and changePhrase language', () => {
+    const reportWith3 = { ...mockReport, historicalPeriods: threePriors };
+
+    it('sessions → label "Website Visits", sublabel "Sessions", phrase ends with "sessions"', async () => {
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.label).toBe('Website Visits');
+      expect(props.sessions.sublabel).toBe('Sessions');
+      expect(props.sessions.changePhrase).toMatch(/sessions$/);
+    });
+
+    it('avgDuration → label "Avg. Time on Site", sublabel "Avg. Duration", phrase ends with "average sessions"', async () => {
+      // avg duration priors = (160+165+170)/3 = 165, current = 185 → 12% longer
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.avgDuration.label).toBe('Avg. Time on Site');
+      expect(props.avgDuration.sublabel).toBe('Avg. Duration');
+      expect(props.avgDuration.changePhrase).toMatch(/longer average sessions$/);
+    });
+
+    it('activeUsers → label "Total Visitors", sublabel "Active Users", phrase ends with "active users"', async () => {
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.activeUsers.label).toBe('Total Visitors');
+      expect(props.activeUsers.sublabel).toBe('Active Users');
+      expect(props.activeUsers.changePhrase).toMatch(/active users$/);
+    });
+
+    it('newUsers → label "First-Time Visitors", sublabel "New Users", phrase ends with "new users"', async () => {
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.newUsers.label).toBe('First-Time Visitors');
+      expect(props.newUsers.sublabel).toBe('New Users');
+      expect(props.newUsers.changePhrase).toMatch(/new users$/);
+    });
+
+    it('avgDuration downward trend → "shorter average sessions"', async () => {
+      // avg duration = 165, current = 130 → shorter
+      const reportDurationDown = { ...mockReport, avgSessionDurationSecs: 130, historicalPeriods: threePriors };
+      await renderAnalyticsReportEmail(reportDurationDown, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.avgDuration.changePhrase).toMatch(/shorter average sessions$/);
+      expect(props.avgDuration.changeDirection).toBe('down');
+    });
+
+    it('each metric has 4 bars when 3 prior periods are provided', async () => {
+      await renderAnalyticsReportEmail(reportWith3, mockClient, mockPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.bars).toHaveLength(4);
+      expect(props.avgDuration.bars).toHaveLength(4);
+      expect(props.activeUsers.bars).toHaveLength(4);
+      expect(props.newUsers.bars).toHaveLength(4);
+    });
+  });
+});
