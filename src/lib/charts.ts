@@ -99,7 +99,9 @@ async function generateBarChart(
         ],
       },
       options: {
-        ...(isHorizontal ? { indexAxis: 'y' } : { layout: { padding: { top: 24 } } }),
+        ...(isHorizontal
+          ? { indexAxis: 'y', layout: { padding: { right: 50 } } }
+          : { layout: { padding: { top: 24 } } }),
         plugins: {
           legend: { display: false },
           datalabels: {
