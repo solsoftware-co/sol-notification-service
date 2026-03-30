@@ -1,18 +1,18 @@
 import { colors } from '../emails/styles';
-import type { DailyMetric, TrafficSource } from '../types/index';
+import type { DailyMetric } from '../types/index';
 
 // ---------------------------------------------------------------------------
 // Layer 1: HTTP transport (private)
 // ---------------------------------------------------------------------------
 
-async function callQuickChart(chart: object, height: number): Promise<Buffer> {
+async function callQuickChart(chart: object, height: number, width = 760): Promise<Buffer> {
   const res = await fetch('https://quickchart.io/chart', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       version: 3,
       chart,
-      width: 760,
+      width,
       height,
       format: 'png',
       backgroundColor: colors.surface,
@@ -21,6 +21,17 @@ async function callQuickChart(chart: object, height: number): Promise<Buffer> {
   if (!res.ok) throw new Error(`QuickChart ${res.status}: ${res.statusText}`);
   return Buffer.from(await res.arrayBuffer());
 }
+
+// Fixed fill colors per traffic category — chosen so white labels are readable on all slices
+const CATEGORY_COLORS: Record<string, string> = {
+  Search:   '#3A6EA5', // accent blue
+  Social:   '#5E96C7', // medium blue
+  Direct:   '#52525B', // charcoal (textSecondary)
+  Email:    '#71717A', // mid gray
+  Referral: '#8A8A95', // muted gray
+  Other:    '#A1A1AA', // light gray — unattributed / unlisted sources
+};
+const CATEGORY_COLOR_FALLBACK = '#8A8A95';
 
 // ---------------------------------------------------------------------------
 // Layer 2: Branded chart config builders (private)
@@ -146,13 +157,49 @@ export async function generateDailyTrendChart(metrics: DailyMetric[]): Promise<B
   return generateAreaChart(labels, values);
 }
 
-export async function generateTopSourcesChart(sources: TrafficSource[]): Promise<Buffer> {
-  if (sources.length === 0) throw new Error('generateTopSourcesChart: sources array is empty');
-  const labels = sources.map((s) =>
-    s.source.length > 30 ? s.source.slice(0, 29) + '\u2026' : s.source,
+/** Generates a single half-doughnut gauge arc — no labels inside the image.
+ *  Percentage and category name are rendered as HTML in the email template. */
+async function generateCategoryGauge(sessions: number, totalSessions: number): Promise<Buffer> {
+  const pct = totalSessions > 0 ? Math.round((sessions / totalSessions) * 100) : 0;
+  const remaining = 100 - pct;
+
+  return callQuickChart(
+    {
+      type: 'doughnut',
+      data: {
+        datasets: [
+          {
+            data: [pct, remaining],
+            backgroundColor: [colors.currentBar, colors.border],
+            borderWidth: 0,
+            borderRadius: 6,
+          },
+        ],
+      },
+      options: {
+        circumference: 180,
+        rotation: -90,
+        cutout: '65%',
+        layout: { padding: 12 },
+        plugins: {
+          legend: { display: false },
+          datalabels: { display: false },
+        },
+      },
+    },
+    120,
+    220,
   );
-  const values = sources.map((s) => s.sessions);
-  return generateBarChart(labels, values);
+}
+
+/** Renders one gauge arc per top-3 traffic category (no labels — rendered in HTML). */
+export async function generateTopSourcesGauges(
+  categories: Array<{ label: string; sessions: number }>,
+  totalSessions: number,
+): Promise<Buffer[]> {
+  if (categories.length === 0) throw new Error('generateTopSourcesGauges: sources array is empty');
+  const top3 = categories.slice(0, 3);
+  return Promise.all(top3.map((c) => generateCategoryGauge(c.sessions, totalSessions)));
 }
 
 export async function generateTopPagesChart(pages: Array<{ label: string; views: number }>): Promise<Buffer> {

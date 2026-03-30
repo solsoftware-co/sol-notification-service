@@ -3,7 +3,7 @@
 const mockReadFile = vi.hoisted(() => vi.fn());
 const mockRender = vi.hoisted(() => vi.fn());
 const mockGenerateDailyTrendChart = vi.hoisted(() => vi.fn());
-const mockGenerateTopSourcesChart = vi.hoisted(() => vi.fn());
+const mockGenerateTopSourcesGauges = vi.hoisted(() => vi.fn());
 const mockGenerateTopPagesChart = vi.hoisted(() => vi.fn());
 const mockAnalyticsReportEmailFn = vi.hoisted(() => vi.fn());
 
@@ -30,7 +30,7 @@ vi.mock('../../../src/lib/config', () => ({
 
 vi.mock('../../../src/lib/charts', () => ({
   generateDailyTrendChart: mockGenerateDailyTrendChart,
-  generateTopSourcesChart: mockGenerateTopSourcesChart,
+  generateTopSourcesGauges: mockGenerateTopSourcesGauges,
   generateTopPagesChart: mockGenerateTopPagesChart,
 }));
 
@@ -38,7 +38,7 @@ vi.mock('../../../src/emails/templates/analytics-report-v1', () => ({
   default: mockAnalyticsReportEmailFn,
 }));
 
-import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle, pageTitle } from '../../../src/lib/templates';
+import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle, pageTitle, categorizeSource } from '../../../src/lib/templates';
 import type { FormSubmittedPayload, ClientRow, AnalyticsReport, ResolvedPeriod, ReportPeriodPreset } from '../../../src/types/index';
 
 // ---------------------------------------------------------------------------
@@ -92,9 +92,54 @@ beforeEach(() => {
   mockReadFile.mockResolvedValue(mockBannerBuffer);
   mockRender.mockResolvedValue(mockHtml);
   mockGenerateDailyTrendChart.mockResolvedValue(mockChartBuffer);
-  mockGenerateTopSourcesChart.mockResolvedValue(mockChartBuffer);
+  mockGenerateTopSourcesGauges.mockResolvedValue([mockChartBuffer, mockChartBuffer, mockChartBuffer]);
   mockGenerateTopPagesChart.mockResolvedValue(mockChartBuffer);
   mockAnalyticsReportEmailFn.mockReturnValue({ type: 'div', props: {} });
+});
+
+// ---------------------------------------------------------------------------
+// categorizeSource
+// ---------------------------------------------------------------------------
+
+describe('categorizeSource', () => {
+  describe('Direct', () => {
+    it.each(['direct', '(direct)', '(none)', '(not set)', ''])('"%s" → Direct', (s) => {
+      expect(categorizeSource(s)).toBe('Direct');
+    });
+  });
+
+  describe('Search', () => {
+    it.each(['google', 'bing', 'yahoo', 'duckduckgo', 'baidu', 'yandex', 'ecosia', 'brave'])('"%s" → Search', (s) => {
+      expect(categorizeSource(s)).toBe('Search');
+    });
+    it('partial match — "google.search.internal" → Search', () => {
+      expect(categorizeSource('google.search.internal')).toBe('Search');
+    });
+  });
+
+  describe('Social', () => {
+    it.each(['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'reddit', 'youtube', 'x.com', 't.co', 'pinterest'])('"%s" → Social', (s) => {
+      expect(categorizeSource(s)).toBe('Social');
+    });
+    it('domain variant — "linkedin.com" → Social', () => {
+      expect(categorizeSource('linkedin.com')).toBe('Social');
+    });
+  });
+
+  describe('Email', () => {
+    it.each(['email', 'newsletter', 'mailchimp', 'klaviyo', 'sendgrid', 'gmail'])('"%s" → Email', (s) => {
+      expect(categorizeSource(s)).toBe('Email');
+    });
+    it('"weekly-newsletter" → Email', () => {
+      expect(categorizeSource('weekly-newsletter')).toBe('Email');
+    });
+  });
+
+  describe('Referral', () => {
+    it.each(['acmecorp.com', 'techcrunch.com', 'some-partner-blog.io'])('"%s" → Referral', (s) => {
+      expect(categorizeSource(s)).toBe('Referral');
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -215,17 +260,17 @@ describe('renderAnalyticsReportEmail', () => {
 
   it('returns 4 attachments (banner + 3 charts) when all chart data is present', async () => {
     const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
-    expect(result.attachments).toHaveLength(4);
+    expect(result.attachments).toHaveLength(6);
     const filenames = result.attachments.map(a => a.filename);
     expect(filenames).toContain('banner_image.png');
     expect(filenames).toContain('chart_daily.png');
-    expect(filenames).toContain('chart_sources.png');
+    expect(filenames).toContain('chart_sources_0.png');
     expect(filenames).toContain('chart_pages.png');
   });
 
   it('omits sources chart when topSources is empty (graceful fallback)', async () => {
     // Real implementation throws for empty array — replicate that in the mock
-    mockGenerateTopSourcesChart.mockRejectedValue(new Error('sources array is empty'));
+    mockGenerateTopSourcesGauges.mockRejectedValue(new Error('sources array is empty'));
     const reportNoSources: AnalyticsReport = { ...mockReport, topSources: [] };
     const result = await renderAnalyticsReportEmail(reportNoSources, mockClient, mockPeriod);
     const filenames = result.attachments.map(a => a.filename);
@@ -236,7 +281,7 @@ describe('renderAnalyticsReportEmail', () => {
   });
 
   it('returns 3 attachments when one chart fn throws', async () => {
-    mockGenerateTopSourcesChart.mockRejectedValue(new Error('QuickChart 500'));
+    mockGenerateTopSourcesGauges.mockRejectedValue(new Error('QuickChart 500'));
     const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
     expect(result.attachments).toHaveLength(3);
     const filenames = result.attachments.map(a => a.filename);
@@ -256,10 +301,10 @@ describe('renderAnalyticsReportEmail', () => {
   it('chart attachments have correct content_id values', async () => {
     const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
     const daily = result.attachments.find(a => a.filename === 'chart_daily.png')!;
-    const sources = result.attachments.find(a => a.filename === 'chart_sources.png')!;
+    const sources0 = result.attachments.find(a => a.filename === 'chart_sources_0.png')!;
     const pages = result.attachments.find(a => a.filename === 'chart_pages.png')!;
     expect(daily.content_id).toBe('chart_daily');
-    expect(sources.content_id).toBe('chart_sources');
+    expect(sources0.content_id).toBe('chart_sources_0');
     expect(pages.content_id).toBe('chart_pages');
   });
 
@@ -318,6 +363,74 @@ describe('renderAnalyticsReportEmail', () => {
     await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
     const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
     expect(props.dailyMetrics[0].date).toBe('02/16/2026');
+  });
+
+  it('topSources props include a category derived from the source name', async () => {
+    const report = {
+      ...mockReport,
+      topSources: [
+        { source: 'google', sessions: 2000 },
+        { source: 'direct', sessions: 1500 },
+        { source: 'linkedin.com', sessions: 800 },
+        { source: 'newsletter', sessions: 400 },
+        { source: 'techcrunch.com', sessions: 200 },
+      ],
+    };
+    await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+    const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+    expect(props.topSources[0].category).toBe('Search');
+    expect(props.topSources[1].category).toBe('Direct');
+    expect(props.topSources[2].category).toBe('Social');
+    expect(props.topSources[3].category).toBe('Email');
+    expect(props.topSources[4].category).toBe('Referral');
+  });
+
+  it('passes aggregated category totals (not raw sources) to generateTopSourcesChart', async () => {
+    const report = {
+      ...mockReport,
+      sessions: 4820,
+      topSources: [
+        { source: 'google', sessions: 2000 },
+        { source: 'bing', sessions: 500 },    // also Search — should be merged
+        { source: 'direct', sessions: 1500 },
+      ],
+    };
+    await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+    expect(mockGenerateTopSourcesGauges).toHaveBeenCalledOnce();
+    const [categories, totalSessions] = mockGenerateTopSourcesGauges.mock.calls[0];
+    const searchEntry = categories.find((c: any) => c.label === 'Search');
+    expect(searchEntry?.sessions).toBe(2500); // 2000 + 500 merged
+    expect(totalSessions).toBe(4820);
+  });
+
+  it('appends an Other slice so the pie chart represents 100% of total traffic', async () => {
+    // topSources sum to 3500; report.sessions = 4820 → Other = 1320
+    const report = {
+      ...mockReport,
+      sessions: 4820,
+      topSources: [
+        { source: 'google', sessions: 2100 },  // Search
+        { source: 'direct', sessions: 1400 },  // Direct
+      ],
+    };
+    await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+    const [categories] = mockGenerateTopSourcesGauges.mock.calls[0];
+    const other = categories.find((c: any) => c.label === 'Other');
+    expect(other?.sessions).toBe(1320);
+  });
+
+  it('omits the Other slice when topSources already account for all sessions', async () => {
+    const report = {
+      ...mockReport,
+      sessions: 3500,
+      topSources: [
+        { source: 'google', sessions: 2000 },
+        { source: 'direct', sessions: 1500 },
+      ],
+    };
+    await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+    const [categories] = mockGenerateTopSourcesGauges.mock.calls[0];
+    expect(categories.find((c: any) => c.label === 'Other')).toBeUndefined();
   });
 
   it('topPages props include a human-readable name derived from the path', async () => {

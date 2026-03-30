@@ -5,6 +5,7 @@
 import { render } from '@react-email/render';
 import { StatCard } from '../../../src/emails/components/stat-card';
 import type { StatMetric } from '../../../src/emails/components/stat-card';
+import { colors } from '../../../src/emails/styles';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -110,12 +111,12 @@ describe('StatCard', () => {
     });
 
     it('current bar has the darker colour', () => {
-      expect(html).toContain('#71717A');
+      expect(html).toContain(colors.currentBar);
     });
 
     it('renders an upward trend arrow (↑) coloured with the positive token', () => {
       expect(html).toContain('↑');
-      expect(html).toContain('#3A6EA5'); // colors.positive
+      expect(html).toContain(colors.positive);
     });
   });
 
@@ -154,7 +155,7 @@ describe('StatCard', () => {
     });
 
     it('exactly one bar carries the current-period colour', () => {
-      expect(countOccurrences(html, '#71717A')).toBe(1);
+      expect(countOccurrences(html, colors.currentBar)).toBe(1);
     });
 
     it('description uses "You had" prefix', () => {

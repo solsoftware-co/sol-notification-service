@@ -1,5 +1,5 @@
-import { Html, Head, Preview, Body } from '@react-email/components';
-import { colors } from '../styles';
+import { Html, Head, Preview, Body, Section, Row, Column, Img, Text } from '@react-email/components';
+import { colors, typography, spacing } from '../styles';
 import { Banner } from '../components/banner';
 import { EmailContainer } from '../components/email-container';
 import { EmailHeader } from '../components/email-header';
@@ -21,11 +21,11 @@ export type AnalyticsEmailProps = {
     avgDuration: StatMetric;
     activeUsers: StatMetric;
     newUsers: StatMetric;
-    topSources: Array<{ source: string; sessions: string }>;
+    topSources: Array<{ source: string; category: string; sessions: string }>;
     topPages: Array<{ name: string; path: string; views: string }>;
     dailyMetrics: Array<{ date: string; sessions: string; activeUsers: string; newUsers: string }>;
     dailyChart?: string;
-    sourcesChart?: string;
+    sourcesGauges?: Array<{ cid: string; label: string; pct: number; sessions: string }>;
     pagesChart?: string;
 };
 
@@ -42,7 +42,7 @@ export default function AnalyticsReportV1Email({
     topPages = [],
     dailyMetrics = [],
     dailyChart,
-    sourcesChart,
+    sourcesGauges,
     pagesChart,
 }: AnalyticsEmailProps) {
     return (
@@ -64,16 +64,75 @@ export default function AnalyticsReportV1Email({
                     {topSources.length > 0 && (
                         <>
                             <SectionDivider />
-                            {sourcesChart && (
-                                <ChartCard
-                                    image={sourcesChart}
-                                    title="Top Sources"
-                                    description="Sessions by acquisition channel"
-                                />
-                            )}
+                        {sourcesGauges && sourcesGauges.length > 0 && (
+                            <Section style={{ marginBottom: '16px' }}>
+                                <Text style={{
+                                    fontFamily: typography.fontStack,
+                                    fontSize: typography.sizes.h2,
+                                    fontWeight: typography.weights.medium,
+                                    color: colors.textPrimary,
+                                    margin: `0 0 ${spacing.sm} 0`,
+                                    lineHeight: typography.lineHeights.heading,
+                                }}>
+                                    Traffic Sources
+                                </Text>
+                                <Text style={{
+                                    fontFamily: typography.fontStack,
+                                    fontSize: typography.sizes.small,
+                                    fontWeight: typography.weights.regular,
+                                    color: colors.textSecondary,
+                                    lineHeight: typography.lineHeights.small,
+                                    margin: `0 0 ${spacing.md} 0`,
+                                }}>
+                                    Session share by traffic category
+                                </Text>
+                                <Row>
+                                    {sourcesGauges.map((g, i) => (
+                                        <Column key={i} style={{ textAlign: 'center', width: '33%' }}>
+                                            <Img src={g.cid} width="180" alt={g.label} style={{ display: 'block', margin: '0 auto' }} />
+                                            <Text style={{
+                                                fontFamily: typography.fontStack,
+                                                fontSize: typography.sizes.display,
+                                                fontWeight: typography.weights.regular,
+                                                color: colors.textPrimary,
+                                                lineHeight: typography.lineHeights.tight,
+                                                letterSpacing: typography.letterSpacing.tight,
+                                                margin: '0 0 4px 0',
+                                                textAlign: 'center',
+                                            }}>
+                                                {g.pct}%
+                                            </Text>
+                                            <Text style={{
+                                                fontFamily: typography.fontStack,
+                                                fontSize: typography.sizes.small,
+                                                fontWeight: typography.weights.regular,
+                                                color: colors.textSecondary,
+                                                lineHeight: typography.lineHeights.small,
+                                                textAlign: 'center',
+                                                margin: '0 0 2px 0',
+                                            }}>
+                                                {g.sessions}
+                                            </Text>
+                                            <Text style={{
+                                                fontFamily: typography.fontStack,
+                                                fontSize: typography.sizes.small,
+                                                fontWeight: typography.weights.regular,
+                                                color: colors.textMuted,
+                                                lineHeight: typography.lineHeights.small,
+                                                textAlign: 'center',
+                                                margin: '0 0 12px 0',
+                                            }}>
+                                                {g.label}
+                                            </Text>
+                                        </Column>
+                                    ))}
+                                </Row>
+                            </Section>
+                        )}
                             <DataTable
-                                columns={['Source', 'Sessions']}
-                                rows={topSources.map(s => [s.source, s.sessions])}
+                                columns={['Source', 'Category', 'Sessions']}
+                                rows={topSources.map(s => [s.source, s.category, s.sessions])}
+                                align={['left', 'left', 'right']}
                             />
                         </>
                     )}

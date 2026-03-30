@@ -7,12 +7,13 @@ export const colors = {
   surface:       '#FFFFFF',  // card / content block background
   shading:       '#FBFBFC',  // subtle background shading
   border:        '#E4E4E7',  // card borders, dividers, table row separators
+  currentBar:    '#5E5E68',
   textPrimary:   '#36363B',  // headings, stat numbers, field values
   textSecondary: '#52525B',  // body text, descriptions, context lines
   textMuted:     '#A1A1AA',  // footer, field labels, metadata
   accent:        '#3A6EA5',  // links, CTA buttons, message-block left border
   accentShading: 'rgba(94,150,199,0.15)',
-  positive:      '#3A6EA5',  // upward trend indicators
+  positive:      '#138808',  // upward trend indicators
   negative:      '#C04000',  // downward trend indicators (soft rose, not aggressive red)
 } as const;
 

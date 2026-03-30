@@ -5,7 +5,7 @@ import SalesLeadV1Email from '../emails/templates/sales-lead-v1';
 import AnalyticsReportV1Email from '../emails/templates/analytics-report-v1';
 import {
   generateDailyTrendChart,
-  generateTopSourcesChart,
+  generateTopSourcesGauges,
   generateTopPagesChart,
 } from './charts';
 import { log } from '../utils/logger';
@@ -19,6 +19,19 @@ import type {
   ResolvedPeriod,
 } from '../types/index';
 import type { StatMetric } from '../emails/templates/analytics-report-v1';
+
+/** Maps a raw GA4 sessionSource value to a human-readable traffic category. */
+export function categorizeSource(source: string): string {
+  const s = source.toLowerCase().trim();
+  if (!s || s === 'direct' || s === '(direct)' || s === '(none)' || s === '(not set)') return 'Direct';
+  const searchEngines = ['google', 'bing', 'yahoo', 'duckduckgo', 'baidu', 'ecosia', 'yandex', 'ask', 'aol', 'brave'];
+  if (searchEngines.includes(s) || s.includes('search')) return 'Search';
+  const socialPlatforms = ['facebook', 'instagram', 'twitter', 'linkedin', 'pinterest', 'tiktok', 'reddit', 'youtube', 'snapchat', 'x.com', 't.co', 'threads', 'whatsapp', 'telegram', 'discord'];
+  if (socialPlatforms.some(p => s === p || s.includes(p))) return 'Social';
+  const emailProviders = ['email', 'newsletter', 'mailchimp', 'klaviyo', 'sendgrid', 'brevo', 'hubspot', 'gmail'];
+  if (emailProviders.some(p => s === p || s.includes(p)) || s.includes('mail')) return 'Email';
+  return 'Referral';
+}
 
 /** Converts a raw URL path to a human-readable page name.
  *  `/` → "Home", `/neighborhoods/the-preserve` → "The Preserve" */
@@ -197,11 +210,28 @@ export async function renderAnalyticsReportEmail(
     log(`[charts] daily trend chart failed: ${e}`);
   }
 
-  let sourcesChartBuf: Buffer | null = null;
+  // Aggregate raw sources into categories for the pie chart.
+  // The topSources list is only the top N sources, so we add an "Other" slice
+  // for the remaining sessions so that 100% of the pie = total site traffic.
+  const categoryTotals: Record<string, number> = {};
+  for (const s of report.topSources) {
+    const cat = categorizeSource(s.source);
+    categoryTotals[cat] = (categoryTotals[cat] ?? 0) + s.sessions;
+  }
+  const totalCategorized = Object.values(categoryTotals).reduce((sum, v) => sum + v, 0);
+  const categoryAggregates = Object.entries(categoryTotals)
+    .map(([label, sessions]) => ({ label, sessions }))
+    .sort((a, b) => b.sessions - a.sessions);
+  const otherSessions = report.sessions - totalCategorized;
+  if (otherSessions > 0) {
+    categoryAggregates.push({ label: 'Other', sessions: otherSessions });
+  }
+
+  let sourcesGaugeBufs: Buffer[] = [];
   try {
-    sourcesChartBuf = await generateTopSourcesChart(report.topSources);
+    sourcesGaugeBufs = await generateTopSourcesGauges(categoryAggregates, report.sessions);
   } catch (e) {
-    log(`[charts] top sources chart failed: ${e}`);
+    log(`[charts] top sources gauges failed: ${e}`);
   }
 
   let pagesChartBuf: Buffer | null = null;
@@ -222,14 +252,14 @@ export async function renderAnalyticsReportEmail(
       content_type: 'image/png',
     });
   }
-  if (sourcesChartBuf) {
+  sourcesGaugeBufs.forEach((buf, i) => {
     attachments.push({
-      filename: 'chart_sources.png',
-      content: sourcesChartBuf.toString('base64'),
-      content_id: 'chart_sources',
+      filename: `chart_sources_${i}.png`,
+      content: buf.toString('base64'),
+      content_id: `chart_sources_${i}`,
       content_type: 'image/png',
     });
-  }
+  });
   if (pagesChartBuf) {
     attachments.push({
       filename: 'chart_pages.png',
@@ -251,6 +281,7 @@ export async function renderAnalyticsReportEmail(
       newUsers,
       topSources: report.topSources.map((s) => ({
         source: s.source,
+        category: categorizeSource(s.source),
         sessions: s.sessions.toLocaleString(),
       })),
       topPages: report.topPages.map((p) => ({
@@ -265,7 +296,16 @@ export async function renderAnalyticsReportEmail(
         newUsers: d.newUsers.toLocaleString(),
       })),
       dailyChart: dailyChartBuf ? 'cid:chart_daily' : undefined,
-      sourcesChart: sourcesChartBuf ? 'cid:chart_sources' : undefined,
+      sourcesGauges: sourcesGaugeBufs.length > 0
+        ? sourcesGaugeBufs.map((_, i) => ({
+            cid: `cid:chart_sources_${i}`,
+            label: categoryAggregates[i]?.label ?? '',
+            pct: categoryAggregates[i]
+              ? Math.round(categoryAggregates[i].sessions / report.sessions * 100)
+              : 0,
+            sessions: (categoryAggregates[i]?.sessions ?? 0).toLocaleString(),
+          }))
+        : undefined,
       pagesChart: pagesChartBuf ? 'cid:chart_pages' : undefined,
     }),
   );

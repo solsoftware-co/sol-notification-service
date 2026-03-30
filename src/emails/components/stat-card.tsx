@@ -115,7 +115,7 @@ export function StatCard({ metric }: StatCardProps) {
                                                     <tr>
                                                         <td style={{
                                                             height: `${barHeight}px`,
-                                                            backgroundColor: bar.isCurrent ? '#71717A' : colors.border,
+                                                            backgroundColor: bar.isCurrent ? colors.currentBar : colors.border,
                                                             borderRadius: '2px 2px 0 0',
                                                             fontSize: '0',
                                                             lineHeight: '0',
