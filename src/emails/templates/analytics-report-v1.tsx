@@ -22,7 +22,7 @@ export type AnalyticsEmailProps = {
     activeUsers: StatMetric;
     newUsers: StatMetric;
     topSources: Array<{ source: string; sessions: string }>;
-    topPages: Array<{ path: string; views: string }>;
+    topPages: Array<{ name: string; path: string; views: string }>;
     dailyMetrics: Array<{ date: string; sessions: string; activeUsers: string; newUsers: string }>;
     dailyChart?: string;
     sourcesChart?: string;
@@ -89,8 +89,9 @@ export default function AnalyticsReportV1Email({
                                 />
                             )}
                             <DataTable
-                                columns={['Page', 'Views']}
-                                rows={topPages.map(p => [p.path, p.views])}
+                                columns={['Page', 'Path', 'Views']}
+                                rows={topPages.map(p => [p.name, p.path, p.views])}
+                                align={['left', 'left', 'right']}
                             />
                         </>
                     )}

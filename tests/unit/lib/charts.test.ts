@@ -10,7 +10,7 @@ import {
   generateTopSourcesChart,
   generateTopPagesChart,
 } from '../../../src/lib/charts';
-import type { DailyMetric, TrafficSource, TopPage } from '../../../src/types/index';
+import type { DailyMetric, TrafficSource } from '../../../src/types/index';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -46,10 +46,10 @@ const sources: TrafficSource[] = [
   { source: 'a-very-long-source-name-that-exceeds-thirty-characters', sessions: 500 },
 ];
 
-const pages: TopPage[] = [
-  { path: '/', views: 5430 },
-  { path: '/services', views: 3120 },
-  { path: '/a-very-long-page-path-that-exceeds-thirty-characters', views: 100 },
+const pages: Array<{ label: string; views: number }> = [
+  { label: 'Home', views: 5430 },
+  { label: 'Services', views: 3120 },
+  { label: 'A Very Long Page Name That Exceeds Thirty Characters', views: 100 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -212,14 +212,14 @@ describe('generateTopPagesChart', () => {
     expect(chart.options.indexAxis).toBeUndefined();
   });
 
-  it('maps page paths to labels', async () => {
+  it('maps pre-computed labels to chart labels', async () => {
     await generateTopPagesChart(pages);
     const chart = captureChartConfig() as any;
-    expect(chart.data.labels[0]).toBe('/');
-    expect(chart.data.labels[1]).toBe('/services');
+    expect(chart.data.labels[0]).toBe('Home');
+    expect(chart.data.labels[1]).toBe('Services');
   });
 
-  it('truncates page path labels longer than 30 chars with ellipsis', async () => {
+  it('truncates labels longer than 30 chars with ellipsis', async () => {
     await generateTopPagesChart(pages);
     const chart = captureChartConfig() as any;
     const truncated: string = chart.data.labels[2];

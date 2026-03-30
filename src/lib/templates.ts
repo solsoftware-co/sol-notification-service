@@ -20,6 +20,16 @@ import type {
 } from '../types/index';
 import type { StatMetric } from '../emails/templates/analytics-report-v1';
 
+/** Converts a raw URL path to a human-readable page name.
+ *  `/` → "Home", `/neighborhoods/the-preserve` → "The Preserve" */
+export function pageTitle(path: string): string {
+  if (!path || path === '/') return 'Home';
+  const segment = path.split('/').filter(Boolean).pop() ?? path;
+  return segment
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export function buildReportTitle(preset: ReportPeriodPreset): string {
   switch (preset) {
     case 'last_week':    return 'Weekly Analytics Report';
@@ -196,7 +206,9 @@ export async function renderAnalyticsReportEmail(
 
   let pagesChartBuf: Buffer | null = null;
   try {
-    pagesChartBuf = await generateTopPagesChart(report.topPages);
+    pagesChartBuf = await generateTopPagesChart(
+      report.topPages.map(p => ({ label: pageTitle(p.path), views: p.views })),
+    );
   } catch (e) {
     log(`[charts] top pages chart failed: ${e}`);
   }
@@ -242,6 +254,7 @@ export async function renderAnalyticsReportEmail(
         sessions: s.sessions.toLocaleString(),
       })),
       topPages: report.topPages.map((p) => ({
+        name: pageTitle(p.path),
         path: p.path,
         views: p.views.toLocaleString(),
       })),

@@ -1,5 +1,5 @@
 import { colors } from '../emails/styles';
-import type { DailyMetric, TrafficSource, TopPage } from '../types/index';
+import type { DailyMetric, TrafficSource } from '../types/index';
 
 // ---------------------------------------------------------------------------
 // Layer 1: HTTP transport (private)
@@ -153,10 +153,10 @@ export async function generateTopSourcesChart(sources: TrafficSource[]): Promise
   return generateBarChart(labels, values);
 }
 
-export async function generateTopPagesChart(pages: TopPage[]): Promise<Buffer> {
+export async function generateTopPagesChart(pages: Array<{ label: string; views: number }>): Promise<Buffer> {
   if (pages.length === 0) throw new Error('generateTopPagesChart: pages array is empty');
   const labels = pages.map((p) =>
-    p.path.length > 30 ? p.path.slice(0, 29) + '\u2026' : p.path,
+    p.label.length > 30 ? p.label.slice(0, 29) + '\u2026' : p.label,
   );
   const values = pages.map((p) => p.views);
   return generateBarChart(labels, values);

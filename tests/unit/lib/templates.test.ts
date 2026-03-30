@@ -38,7 +38,7 @@ vi.mock('../../../src/emails/templates/analytics-report-v1', () => ({
   default: mockAnalyticsReportEmailFn,
 }));
 
-import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle } from '../../../src/lib/templates';
+import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle, pageTitle } from '../../../src/lib/templates';
 import type { FormSubmittedPayload, ClientRow, AnalyticsReport, ResolvedPeriod, ReportPeriodPreset } from '../../../src/types/index';
 
 // ---------------------------------------------------------------------------
@@ -95,6 +95,22 @@ beforeEach(() => {
   mockGenerateTopSourcesChart.mockResolvedValue(mockChartBuffer);
   mockGenerateTopPagesChart.mockResolvedValue(mockChartBuffer);
   mockAnalyticsReportEmailFn.mockReturnValue({ type: 'div', props: {} });
+});
+
+// ---------------------------------------------------------------------------
+// pageTitle
+// ---------------------------------------------------------------------------
+
+describe('pageTitle', () => {
+  it('/ → "Home"', () => expect(pageTitle('/')).toBe('Home'));
+  it('empty string → "Home"', () => expect(pageTitle('')).toBe('Home'));
+  it('/about → "About"', () => expect(pageTitle('/about')).toBe('About'));
+  it('/portfolio → "Portfolio"', () => expect(pageTitle('/portfolio')).toBe('Portfolio'));
+  it('/case-studies → "Case Studies" (hyphens become spaces)', () => expect(pageTitle('/case-studies')).toBe('Case Studies'));
+  it('/the_team → "The Team" (underscores become spaces)', () => expect(pageTitle('/the_team')).toBe('The Team'));
+  it('/neighborhoods/the-preserve → "The Preserve" (uses last segment)', () => expect(pageTitle('/neighborhoods/the-preserve')).toBe('The Preserve'));
+  it('/blog/my-first-post → "My First Post"', () => expect(pageTitle('/blog/my-first-post')).toBe('My First Post'));
+  it('/a/b/c → "C" (deeply nested)', () => expect(pageTitle('/a/b/c')).toBe('C'));
 });
 
 // ---------------------------------------------------------------------------
@@ -302,6 +318,30 @@ describe('renderAnalyticsReportEmail', () => {
     await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
     const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
     expect(props.dailyMetrics[0].date).toBe('02/16/2026');
+  });
+
+  it('topPages props include a human-readable name derived from the path', async () => {
+    const report = {
+      ...mockReport,
+      topPages: [
+        { path: '/', views: 500 },
+        { path: '/services', views: 300 },
+        { path: '/neighborhoods/the-preserve', views: 120 },
+      ],
+    };
+    await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+    const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+    expect(props.topPages[0].name).toBe('Home');
+    expect(props.topPages[1].name).toBe('Services');
+    expect(props.topPages[2].name).toBe('The Preserve');
+  });
+
+  it('topPages props preserve the original path alongside the name', async () => {
+    const report = { ...mockReport, topPages: [{ path: '/case-studies', views: 200 }] };
+    await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
+    const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+    expect(props.topPages[0].name).toBe('Case Studies');
+    expect(props.topPages[0].path).toBe('/case-studies');
   });
 
   it('formats GA4 compact date (YYYYMMDD) to MM/DD/YYYY in dailyMetrics passed to template', async () => {
