@@ -32,9 +32,13 @@ vi.mock("../../../../src/lib/email", () => ({
   sendEmail: mockSendEmail,
 }));
 
-vi.mock("../../../../src/lib/templates", () => ({
-  renderAnalyticsReportEmail: mockRenderAnalyticsReport,
-}));
+vi.mock("../../../../src/lib/templates", async () => {
+  const actual = await vi.importActual<typeof import("../../../../src/lib/templates")>("../../../../src/lib/templates");
+  return {
+    renderAnalyticsReportEmail: mockRenderAnalyticsReport,
+    buildReportTitle: actual.buildReportTitle,
+  };
+});
 
 vi.mock("../../../../src/utils/logger", () => ({
   log: vi.fn(),
@@ -494,6 +498,33 @@ describe("check-ga4-config — client has no GA4 property, emailMode live", () =
         client_id: "client-1",
         workflow: "send-analytics-report",
       })
+    );
+  });
+
+  it('skip-log subject is "Weekly Analytics Report" for last_week preset', async () => {
+    (config as any).emailMode = "live";
+    mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
+
+    await freshEngine().execute();
+
+    expect(mockWriteNotificationLog).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: "Weekly Analytics Report" })
+    );
+  });
+
+  it('skip-log subject is "Monthly Analytics Report" for last_month preset', async () => {
+    (config as any).emailMode = "live";
+    mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
+
+    const engine = new InngestTestEngine({
+      function: sendAnalyticsReport,
+      events: [{ ...baseEvent, data: { ...baseEvent.data, reportPeriod: { preset: "last_month" as const } } }],
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    await engine.execute();
+
+    expect(mockWriteNotificationLog).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: "Monthly Analytics Report" })
     );
   });
 });

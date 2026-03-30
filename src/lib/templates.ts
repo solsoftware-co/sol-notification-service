@@ -20,6 +20,16 @@ import type {
 } from '../types/index';
 import type { StatMetric } from '../emails/templates/analytics-report-v1';
 
+export function buildReportTitle(preset: ReportPeriodPreset): string {
+  switch (preset) {
+    case 'last_week':    return 'Weekly Analytics Report';
+    case 'last_month':   return 'Monthly Analytics Report';
+    case 'last_30_days': return '30-Day Analytics Report';
+    case 'last_90_days': return '90-Day Analytics Report';
+    case 'custom':       return 'Analytics Report';
+  }
+}
+
 function shortDate(isoDate: string): string {
   const [, mm, dd] = isoDate.split('-');
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -221,7 +231,7 @@ export async function renderAnalyticsReportEmail(
     AnalyticsReportV1Email({
       previewText,
       subheader: client.name,
-      header: 'Weekly Analytics Report',
+      header: buildReportTitle(period.preset),
       periodLabel: period.label,
       sessions,
       avgDuration,

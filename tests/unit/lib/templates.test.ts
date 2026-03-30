@@ -38,8 +38,8 @@ vi.mock('../../../src/emails/templates/analytics-report-v1', () => ({
   default: mockAnalyticsReportEmailFn,
 }));
 
-import { renderFormNotificationEmail, renderAnalyticsReportEmail } from '../../../src/lib/templates';
-import type { FormSubmittedPayload, ClientRow, AnalyticsReport, ResolvedPeriod } from '../../../src/types/index';
+import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle } from '../../../src/lib/templates';
+import type { FormSubmittedPayload, ClientRow, AnalyticsReport, ResolvedPeriod, ReportPeriodPreset } from '../../../src/types/index';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -95,6 +95,24 @@ beforeEach(() => {
   mockGenerateTopSourcesChart.mockResolvedValue(mockChartBuffer);
   mockGenerateTopPagesChart.mockResolvedValue(mockChartBuffer);
   mockAnalyticsReportEmailFn.mockReturnValue({ type: 'div', props: {} });
+});
+
+// ---------------------------------------------------------------------------
+// buildReportTitle
+// ---------------------------------------------------------------------------
+
+describe('buildReportTitle', () => {
+  const cases: Array<[ReportPeriodPreset, string]> = [
+    ['last_week',    'Weekly Analytics Report'],
+    ['last_month',   'Monthly Analytics Report'],
+    ['last_30_days', '30-Day Analytics Report'],
+    ['last_90_days', '90-Day Analytics Report'],
+    ['custom',       'Analytics Report'],
+  ];
+
+  it.each(cases)('preset "%s" → "%s"', (preset, expected) => {
+    expect(buildReportTitle(preset)).toBe(expected);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -247,6 +265,36 @@ describe('renderAnalyticsReportEmail', () => {
     const [element] = mockRender.mock.calls[0];
     expect(element).toBeDefined();
     expect(element.type).toBeDefined();
+  });
+
+  it('passes "Weekly Analytics Report" as header for last_week preset', async () => {
+    await renderAnalyticsReportEmail(mockReport, mockClient, { ...mockPeriod, preset: 'last_week' });
+    const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+    expect(props.header).toBe('Weekly Analytics Report');
+  });
+
+  it('passes "Monthly Analytics Report" as header for last_month preset', async () => {
+    await renderAnalyticsReportEmail(mockReport, mockClient, { ...mockPeriod, preset: 'last_month' });
+    const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+    expect(props.header).toBe('Monthly Analytics Report');
+  });
+
+  it('passes "30-Day Analytics Report" as header for last_30_days preset', async () => {
+    await renderAnalyticsReportEmail(mockReport, mockClient, { ...mockPeriod, preset: 'last_30_days' });
+    const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+    expect(props.header).toBe('30-Day Analytics Report');
+  });
+
+  it('passes "90-Day Analytics Report" as header for last_90_days preset', async () => {
+    await renderAnalyticsReportEmail(mockReport, mockClient, { ...mockPeriod, preset: 'last_90_days' });
+    const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+    expect(props.header).toBe('90-Day Analytics Report');
+  });
+
+  it('passes "Analytics Report" as header for custom preset', async () => {
+    await renderAnalyticsReportEmail(mockReport, mockClient, { ...mockPeriod, preset: 'custom' });
+    const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+    expect(props.header).toBe('Analytics Report');
   });
 
   it('formats ISO date (YYYY-MM-DD) to MM/DD/YYYY in dailyMetrics passed to template', async () => {
