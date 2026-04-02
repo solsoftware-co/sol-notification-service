@@ -212,9 +212,9 @@ function mockReport(period: ResolvedPeriod): AnalyticsReport {
     resolvedPeriod: period,
     isMock: true,
     historicalPeriods: [
-      { periodLabel: 'Feb 2',  sessions: 35, activeUsers: 26, newUsers: 14, avgSessionDurationSecs: 142 },
-      { periodLabel: 'Feb 9',  sessions: 48, activeUsers: 35, newUsers: 21, avgSessionDurationSecs: 138 },
-      { periodLabel: 'Feb 16', sessions: 39, activeUsers: 29, newUsers: 16, avgSessionDurationSecs: 161 },
+      { periodLabel: 'Feb 2',  periodStart: '2026-02-02', sessions: 35, activeUsers: 26, newUsers: 14, avgSessionDurationSecs: 142 },
+      { periodLabel: 'Feb 9',  periodStart: '2026-02-09', sessions: 48, activeUsers: 35, newUsers: 21, avgSessionDurationSecs: 138 },
+      { periodLabel: 'Feb 16', periodStart: '2026-02-16', sessions: 39, activeUsers: 29, newUsers: 16, avgSessionDurationSecs: 161 },
     ],
   };
 }
@@ -283,7 +283,7 @@ export async function getAnalyticsReport(
     priorPeriodDefs.map(p => getPeriodTotals(propertyId, p.start, p.end).catch(() => null))
   );
   const historicalPeriods: HistoricalPeriodSnapshot[] = priorPeriodDefs
-    .map((def, i) => priorResults[i] ? { periodLabel: def.label, ...priorResults[i]! } : null)
+    .map((def, i) => priorResults[i] ? { periodLabel: def.label, periodStart: def.start, ...priorResults[i]! } : null)
     .filter((h): h is HistoricalPeriodSnapshot => h !== null);
 
   return {

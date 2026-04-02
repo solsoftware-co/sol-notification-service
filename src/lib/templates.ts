@@ -59,6 +59,33 @@ function shortDate(isoDate: string): string {
   return `${months[parseInt(mm) - 1]} ${parseInt(dd)}`;
 }
 
+/** Formats an ISO date as a bar-chart label sized for the given preset.
+ *  - last_week / last_30_days  → MM/DD      (e.g. "01/20") — need month+day to tell periods apart
+ *  - last_month                → Mon        (e.g. "Jan")   — single month, name is unambiguous
+ *  - last_90_days              → Mon–Mon    (e.g. "Oct–Dec") — 90-day span; show start + end month
+ *  - custom                    → ""         (history suppressed for custom ranges)
+ */
+function formatBarLabel(isoDate: string, preset: ReportPeriodPreset): string {
+  const [, mm, dd] = isoDate.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  switch (preset) {
+    case 'last_week':
+    case 'last_30_days':
+      return `${mm}/${dd}`;
+    case 'last_month':
+      return months[parseInt(mm) - 1];
+    case 'last_90_days': {
+      const startDate = new Date(isoDate + 'T00:00:00Z');
+      const endDate = new Date(startDate.getTime() + 89 * 86400000);
+      const startMon = months[startDate.getUTCMonth()];
+      const endMon = months[endDate.getUTCMonth()];
+      return startMon === endMon ? startMon : `${startMon}–${endMon}`;
+    }
+    case 'custom':
+      return '';
+  }
+}
+
 function computeChange(current: number, priors: number[]): { pct: number; direction: 'up' | 'down' | 'neutral' } {
   if (priors.length === 0) return { pct: 0, direction: 'neutral' };
   const avg = priors.reduce((s, v) => s + v, 0) / priors.length;
@@ -164,9 +191,10 @@ export async function renderAnalyticsReportEmail(
   const subject = `Your analytics report — ${period.label}`;
   const previewText = `${client.name} — ${period.label}: ${report.sessions.toLocaleString()} sessions`;
 
-  const hp = report.historicalPeriods ?? [];
+  // custom ranges have no meaningful prior-period comparison — suppress history entirely
+  const hp = period.preset === 'custom' ? [] : (report.historicalPeriods ?? []);
   const compLabel = hp.length > 0 ? buildComparisonLabel(period.preset, hp.length) : undefined;
-  const currentBarLabel = shortDate(period.start);
+  const currentBarLabel = period.preset !== 'custom' ? formatBarLabel(period.start, period.preset) : '';
 
   function buildMetric(
     metricKey: 'sessions' | 'activeUsers' | 'newUsers' | 'avgDuration',
@@ -191,7 +219,7 @@ export async function renderAnalyticsReportEmail(
       periodLabel: period.label,
       comparisonLabel: compLabel,
       bars: [
-        ...hp.map(h => ({ label: h.periodLabel, value: priorVals[hp.indexOf(h)], isCurrent: false })),
+        ...hp.map(h => ({ label: formatBarLabel(h.periodStart, period.preset), value: priorVals[hp.indexOf(h)], isCurrent: false })),
         { label: currentBarLabel, value: currentVal, isCurrent: true },
       ],
     };

@@ -476,9 +476,9 @@ describe('renderAnalyticsReportEmail', () => {
 describe('renderAnalyticsReportEmail — historical metric building', () => {
   // Shared prior-period data — 3 weeks of increasing traffic
   const threePriors = [
-    { periodLabel: 'Jan 26', sessions: 3000, activeUsers: 2000, newUsers: 400, avgSessionDurationSecs: 160 },
-    { periodLabel: 'Feb 2',  sessions: 3500, activeUsers: 2400, newUsers: 450, avgSessionDurationSecs: 165 },
-    { periodLabel: 'Feb 9',  sessions: 4000, activeUsers: 2800, newUsers: 500, avgSessionDurationSecs: 170 },
+    { periodLabel: 'Jan 26', periodStart: '2026-01-26', sessions: 3000, activeUsers: 2000, newUsers: 400, avgSessionDurationSecs: 160 },
+    { periodLabel: 'Feb 2',  periodStart: '2026-02-02', sessions: 3500, activeUsers: 2400, newUsers: 450, avgSessionDurationSecs: 165 },
+    { periodLabel: 'Feb 9',  periodStart: '2026-02-09', sessions: 4000, activeUsers: 2800, newUsers: 500, avgSessionDurationSecs: 170 },
   ];
 
   // ---------------------------------------------------------------------------
@@ -523,11 +523,29 @@ describe('renderAnalyticsReportEmail — historical metric building', () => {
       expect(props.sessions.comparisonLabel).toBe('the previous week');
     });
 
-    it('prior bar carries the periodLabel from historicalPeriods', async () => {
-      const report = { ...mockReport, historicalPeriods: [threePriors[2]] };
+    it('prior bar label uses MM/DD format for last_week preset', async () => {
+      const report = { ...mockReport, historicalPeriods: [threePriors[2]] }; // periodStart: 2026-02-09
       await renderAnalyticsReportEmail(report, mockClient, mockPeriod);
       const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
-      expect(props.sessions.bars[0].label).toBe('Feb 9');
+      expect(props.sessions.bars[0].label).toBe('02/09'); // last_week → MM/DD
+    });
+
+    it('prior bar label uses month name for last_month preset', async () => {
+      const report = { ...mockReport, historicalPeriods: [threePriors[2]] }; // periodStart: 2026-02-09
+      const monthPeriod: ResolvedPeriod = { ...mockPeriod, preset: 'last_month' };
+      await renderAnalyticsReportEmail(report, mockClient, monthPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.bars[0].label).toBe('Feb'); // last_month → Mon
+    });
+
+    it('prior bar label uses month range for last_90_days preset', async () => {
+      // periodStart 2026-10-01 + 89 days = 2026-12-29 → Oct–Dec
+      const prior90 = { periodLabel: 'Oct 1', periodStart: '2026-10-01', sessions: 3000, activeUsers: 2000, newUsers: 400, avgSessionDurationSecs: 160 };
+      const report = { ...mockReport, historicalPeriods: [prior90] };
+      const ninetyPeriod: ResolvedPeriod = { ...mockPeriod, preset: 'last_90_days' };
+      await renderAnalyticsReportEmail(report, mockClient, ninetyPeriod);
+      const [props] = mockAnalyticsReportEmailFn.mock.calls[0];
+      expect(props.sessions.bars[0].label).toBe('Oct–Dec'); // last_90_days → Mon–Mon
     });
   });
 
@@ -622,9 +640,9 @@ describe('renderAnalyticsReportEmail — historical metric building', () => {
       ...mockReport,
       sessions: 3535,
       historicalPeriods: [
-        { periodLabel: 'Jan 26', sessions: 3500, activeUsers: 2000, newUsers: 400, avgSessionDurationSecs: 160 },
-        { periodLabel: 'Feb 2',  sessions: 3500, activeUsers: 2400, newUsers: 450, avgSessionDurationSecs: 165 },
-        { periodLabel: 'Feb 9',  sessions: 3500, activeUsers: 2800, newUsers: 500, avgSessionDurationSecs: 170 },
+        { periodLabel: 'Jan 26', periodStart: '2026-01-26', sessions: 3500, activeUsers: 2000, newUsers: 400, avgSessionDurationSecs: 160 },
+        { periodLabel: 'Feb 2',  periodStart: '2026-02-02', sessions: 3500, activeUsers: 2400, newUsers: 450, avgSessionDurationSecs: 165 },
+        { periodLabel: 'Feb 9',  periodStart: '2026-02-09', sessions: 3500, activeUsers: 2800, newUsers: 500, avgSessionDurationSecs: 170 },
       ],
     };
 

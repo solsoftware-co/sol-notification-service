@@ -57,6 +57,7 @@ export interface DailyMetric {
 
 export interface HistoricalPeriodSnapshot {
   periodLabel: string;             // short label for bar chart, e.g. "Feb 2"
+  periodStart: string;             // ISO 8601 start date, e.g. "2026-02-02" — used for preset-aware label formatting
   sessions: number;
   activeUsers: number;
   newUsers: number;
