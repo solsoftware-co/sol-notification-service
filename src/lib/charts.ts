@@ -1,18 +1,18 @@
 import { colors } from '../emails/styles';
-import type { DailyMetric, TrafficSource, TopPage } from '../types/index';
+import type { DailyMetric } from '../types/index';
 
 // ---------------------------------------------------------------------------
 // Layer 1: HTTP transport (private)
 // ---------------------------------------------------------------------------
 
-async function callQuickChart(chart: object, height: number): Promise<Buffer> {
+async function callQuickChart(chart: object, height: number, width = 760): Promise<Buffer> {
   const res = await fetch('https://quickchart.io/chart', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       version: 3,
       chart,
-      width: 760,
+      width,
       height,
       format: 'png',
       backgroundColor: colors.surface,
@@ -21,6 +21,17 @@ async function callQuickChart(chart: object, height: number): Promise<Buffer> {
   if (!res.ok) throw new Error(`QuickChart ${res.status}: ${res.statusText}`);
   return Buffer.from(await res.arrayBuffer());
 }
+
+// Fixed fill colors per traffic category — chosen so white labels are readable on all slices
+const CATEGORY_COLORS: Record<string, string> = {
+  Search:   '#3A6EA5', // accent blue
+  Social:   '#5E96C7', // medium blue
+  Direct:   '#52525B', // charcoal (textSecondary)
+  Email:    '#71717A', // mid gray
+  Referral: '#8A8A95', // muted gray
+  Other:    '#A1A1AA', // light gray — unattributed / unlisted sources
+};
+const CATEGORY_COLOR_FALLBACK = '#8A8A95';
 
 // ---------------------------------------------------------------------------
 // Layer 2: Branded chart config builders (private)
@@ -40,16 +51,17 @@ async function generateAreaChart(
           {
             data: values,
             fill: true,
-            borderColor: colors.accent,
-            backgroundColor: colors.accentShading,
-            pointRadius: 4,
-            pointBackgroundColor: colors.accent,
+            borderColor: colors.border,
+            backgroundColor: colors.shading,
+            pointRadius: 2,
+            pointBackgroundColor: colors.border,
             tension: 0.3,
             borderWidth: 2,
           },
         ],
       },
       options: {
+        layout: { padding: { top: 24 } },
         plugins: {
           legend: { display: false },
           datalabels: {
@@ -57,7 +69,7 @@ async function generateAreaChart(
             align: 'top',
             color: colors.textSecondary,
             font: { size: 10 },
-            formatter: 'function(value) { return value.toLocaleString("en-US"); }',
+            formatter: 'function(value) { var p = Math.round(value).toString().split(""); var o = ""; for (var i = 0; i < p.length; i++) { if (i > 0 && (p.length - i) % 3 === 0) o += ","; o += p[i]; } return o; }',
           },
         },
         scales: {
@@ -66,8 +78,7 @@ async function generateAreaChart(
             grid: { display: false },
           },
           y: {
-            ticks: { color: colors.textMuted, font: { size: 11 } },
-            grid: { display: false },
+            display: false,
           },
         },
       },
@@ -91,13 +102,17 @@ async function generateBarChart(
         datasets: [
           {
             data: values,
-            backgroundColor: colors.accent,
+            backgroundColor: colors.bg,
+            borderColor: colors.border,
+            borderWidth: 1,
             borderRadius: 4,
           },
         ],
       },
       options: {
-        ...(isHorizontal ? { indexAxis: 'y' } : { layout: { padding: { top: 24 } } }),
+        ...(isHorizontal
+          ? { indexAxis: 'y', layout: { padding: { right: 50 } } }
+          : { layout: { padding: { top: 24 } } }),
         plugins: {
           legend: { display: false },
           datalabels: {
@@ -105,16 +120,18 @@ async function generateBarChart(
             align: 'end',
             color: colors.textSecondary,
             font: { size: 10 },
-            formatter: 'function(value) { return value.toLocaleString("en-US"); }',
+            formatter: 'function(value) { var p = Math.round(value).toString().split(""); var o = ""; for (var i = 0; i < p.length; i++) { if (i > 0 && (p.length - i) % 3 === 0) o += ","; o += p[i]; } return o; }',
           },
         },
         scales: {
           x: {
-            ticks: { color: colors.textMuted, font: { size: 11 } },
+            display: isHorizontal ? false : true,
+            ticks: { color: colors.textPrimary, font: { size: 11 } },
             grid: { display: false },
           },
           y: {
-            ticks: { color: colors.textSecondary, font: { size: 11 } },
+            display: isHorizontal ? true : false,
+            ticks: { color: colors.textPrimary, font: { size: 11 } },
             grid: { display: false },
           },
         },
@@ -140,19 +157,55 @@ export async function generateDailyTrendChart(metrics: DailyMetric[]): Promise<B
   return generateAreaChart(labels, values);
 }
 
-export async function generateTopSourcesChart(sources: TrafficSource[]): Promise<Buffer> {
-  if (sources.length === 0) throw new Error('generateTopSourcesChart: sources array is empty');
-  const labels = sources.map((s) =>
-    s.source.length > 30 ? s.source.slice(0, 29) + '\u2026' : s.source,
+/** Generates a single half-doughnut gauge arc — no labels inside the image.
+ *  Percentage and category name are rendered as HTML in the email template. */
+async function generateCategoryGauge(sessions: number, totalSessions: number): Promise<Buffer> {
+  const pct = totalSessions > 0 ? Math.round((sessions / totalSessions) * 100) : 0;
+  const remaining = 100 - pct;
+
+  return callQuickChart(
+    {
+      type: 'doughnut',
+      data: {
+        datasets: [
+          {
+            data: [pct, remaining],
+            backgroundColor: [colors.textMuted, colors.border],
+            borderWidth: 0,
+            borderRadius: 6,
+          },
+        ],
+      },
+      options: {
+        circumference: 180,
+        rotation: -90,
+        cutout: '65%',
+        layout: { padding: 12 },
+        plugins: {
+          legend: { display: false },
+          datalabels: { display: false },
+        },
+      },
+    },
+    120,
+    220,
   );
-  const values = sources.map((s) => s.sessions);
-  return generateBarChart(labels, values);
 }
 
-export async function generateTopPagesChart(pages: TopPage[]): Promise<Buffer> {
+/** Renders one gauge arc per top-3 traffic category (no labels — rendered in HTML). */
+export async function generateTopSourcesGauges(
+  categories: Array<{ label: string; sessions: number }>,
+  totalSessions: number,
+): Promise<Buffer[]> {
+  if (categories.length === 0) throw new Error('generateTopSourcesGauges: sources array is empty');
+  const top3 = categories.slice(0, 3);
+  return Promise.all(top3.map((c) => generateCategoryGauge(c.sessions, totalSessions)));
+}
+
+export async function generateTopPagesChart(pages: Array<{ label: string; views: number }>): Promise<Buffer> {
   if (pages.length === 0) throw new Error('generateTopPagesChart: pages array is empty');
   const labels = pages.map((p) =>
-    p.path.length > 30 ? p.path.slice(0, 29) + '\u2026' : p.path,
+    p.label.length > 30 ? p.label.slice(0, 29) + '\u2026' : p.label,
   );
   const values = pages.map((p) => p.views);
   return generateBarChart(labels, values);

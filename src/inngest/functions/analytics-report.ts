@@ -3,7 +3,7 @@ import { config } from "../../lib/config";
 import { getClientById, writeNotificationLog } from "../../lib/db";
 import { getAnalyticsReport } from "../../lib/analytics";
 import { sendEmail } from "../../lib/email";
-import { renderAnalyticsReportEmail } from "../../lib/templates";
+import { renderAnalyticsReportEmail, buildReportTitle } from "../../lib/templates";
 import { log } from "../../utils/logger";
 import type {
   AnalyticsReportRequestedPayload,
@@ -125,7 +125,7 @@ export const sendAnalyticsReport = inngest.createFunction(
             event_name: "analytics/report.requested",
             outcome: "skipped",
             recipient_email: client.email,
-            subject: "Weekly Analytics Report",
+            subject: buildReportTitle(data.reportPeriod.preset),
             error_message: "Client has no GA4 property configured",
             metadata: {},
           });

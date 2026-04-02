@@ -7,10 +7,10 @@ vi.stubGlobal('fetch', mockFetch);
 
 import {
   generateDailyTrendChart,
-  generateTopSourcesChart,
+  generateTopSourcesGauges,
   generateTopPagesChart,
 } from '../../../src/lib/charts';
-import type { DailyMetric, TrafficSource, TopPage } from '../../../src/types/index';
+import type { DailyMetric } from '../../../src/types/index';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -40,16 +40,16 @@ const dailyMetrics: DailyMetric[] = [
   { date: '2026-02-25', sessions: 1920, activeUsers: 1390, newUsers: 195 },
 ];
 
-const sources: TrafficSource[] = [
-  { source: 'google', sessions: 4820 },
-  { source: 'direct', sessions: 3210 },
-  { source: 'a-very-long-source-name-that-exceeds-thirty-characters', sessions: 500 },
+const sources: Array<{ label: string; sessions: number }> = [
+  { label: 'Search', sessions: 4820 },
+  { label: 'Social', sessions: 3210 },
+  { label: 'Direct', sessions: 1400 },
 ];
 
-const pages: TopPage[] = [
-  { path: '/', views: 5430 },
-  { path: '/services', views: 3120 },
-  { path: '/a-very-long-page-path-that-exceeds-thirty-characters', views: 100 },
+const pages: Array<{ label: string; views: number }> = [
+  { label: 'Home', views: 5430 },
+  { label: 'Services', views: 3120 },
+  { label: 'A Very Long Page Name That Exceeds Thirty Characters', views: 100 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -98,10 +98,10 @@ describe('generateDailyTrendChart', () => {
     expect(chart.data.datasets[0].fill).toBe(true);
   });
 
-  it('uses brand accent colour for borderColor', async () => {
+  it('uses border colour for borderColor (muted line style)', async () => {
     await generateDailyTrendChart(dailyMetrics);
     const chart = captureChartConfig() as any;
-    expect(chart.data.datasets[0].borderColor).toBe(colors.accent);
+    expect(chart.data.datasets[0].borderColor).toBe(colors.border);
   });
 
   it('passes backgroundColor: colors.surface in the QuickChart request body', async () => {
@@ -126,72 +126,105 @@ describe('generateDailyTrendChart', () => {
 });
 
 // ---------------------------------------------------------------------------
-// generateTopSourcesChart
+// generateTopSourcesGauges
 // ---------------------------------------------------------------------------
 
-describe('generateTopSourcesChart', () => {
-  it('sends type: bar config to QuickChart', async () => {
-    await generateTopSourcesChart(sources);
-    const chart = captureChartConfig() as any;
-    expect(chart.type).toBe('bar');
+describe('generateTopSourcesGauges', () => {
+  it('returns an array of Buffers — one per category (up to 3)', async () => {
+    makeFetchOk();
+    makeFetchOk();
+    makeFetchOk();
+    const results = await generateTopSourcesGauges(sources, 10000);
+    expect(Array.isArray(results)).toBe(true);
+    expect(results).toHaveLength(3);
+    results.forEach(r => expect(Buffer.isBuffer(r)).toBe(true));
   });
 
-  it('does not set indexAxis when fewer than 8 sources (vertical bars)', async () => {
-    await generateTopSourcesChart(sources); // fixture has 3 sources
-    const chart = captureChartConfig() as any;
-    expect(chart.options.indexAxis).toBeUndefined();
+  it('caps at 3 gauges even when more categories are supplied', async () => {
+    makeFetchOk();
+    makeFetchOk();
+    makeFetchOk();
+    const many = [
+      { label: 'Search',   sessions: 4000 },
+      { label: 'Social',   sessions: 2000 },
+      { label: 'Direct',   sessions: 1500 },
+      { label: 'Email',    sessions: 800  },
+      { label: 'Referral', sessions: 300  },
+    ];
+    const results = await generateTopSourcesGauges(many, 10000);
+    expect(results).toHaveLength(3);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
-  it('sets indexAxis: y when 8 or more sources (horizontal bars)', async () => {
-    const manySources: TrafficSource[] = Array.from({ length: 8 }, (_, i) => ({
-      source: `source-${i}`,
-      sessions: 100 - i,
-    }));
-    await generateTopSourcesChart(manySources);
+  it('sends type: doughnut config to QuickChart', async () => {
+    makeFetchOk();
+    await generateTopSourcesGauges([sources[0]], 10000);
     const chart = captureChartConfig() as any;
-    expect(chart.options.indexAxis).toBe('y');
+    expect(chart.type).toBe('doughnut');
   });
 
-  it('maps source names to labels', async () => {
-    await generateTopSourcesChart(sources);
+  it('sets circumference: 180 and rotation: -90 for half-circle gauge', async () => {
+    makeFetchOk();
+    await generateTopSourcesGauges([sources[0]], 10000);
     const chart = captureChartConfig() as any;
-    expect(chart.data.labels[0]).toBe('google');
-    expect(chart.data.labels[1]).toBe('direct');
+    expect(chart.options.circumference).toBe(180);
+    expect(chart.options.rotation).toBe(-90);
   });
 
-  it('truncates labels longer than 30 chars with ellipsis', async () => {
-    await generateTopSourcesChart(sources);
+  it('fills arc proportionally — category sessions / totalSessions rounded to nearest %', async () => {
+    makeFetchOk();
+    // 4820 / 10000 = 48.2% → rounds to 48
+    await generateTopSourcesGauges([{ label: 'Search', sessions: 4820 }], 10000);
     const chart = captureChartConfig() as any;
-    const truncated: string = chart.data.labels[2];
-    expect(truncated.length).toBeLessThanOrEqual(30);
-    expect(truncated.endsWith('\u2026')).toBe(true);
+    expect(chart.data.datasets[0].data[0]).toBe(48);
+    expect(chart.data.datasets[0].data[1]).toBe(52); // remainder
   });
 
-  it('maps sessions to dataset values', async () => {
-    await generateTopSourcesChart(sources);
+  it('uses colors.textMuted for the filled arc and colors.border for the background arc', async () => {
+    makeFetchOk();
+    await generateTopSourcesGauges([sources[0]], 10000);
     const chart = captureChartConfig() as any;
-    expect(chart.data.datasets[0].data[0]).toBe(4820);
+    const bg: string[] = chart.data.datasets[0].backgroundColor;
+    expect(bg[0]).toBe(colors.textMuted);
+    expect(bg[1]).toBe(colors.border);
   });
 
-  it('uses brand accent colour for backgroundColor', async () => {
-    await generateTopSourcesChart(sources);
+  it('applies borderRadius to the dataset for rounded arc ends', async () => {
+    makeFetchOk();
+    await generateTopSourcesGauges([sources[0]], 10000);
     const chart = captureChartConfig() as any;
-    expect(chart.data.datasets[0].backgroundColor).toBe(colors.accent);
+    expect(chart.data.datasets[0].borderRadius).toBeGreaterThan(0);
+  });
+
+  it('hides all labels inside the chart image (percentage and name rendered as HTML)', async () => {
+    makeFetchOk();
+    await generateTopSourcesGauges([sources[0]], 10000);
+    const chart = captureChartConfig() as any;
+    expect(chart.options.plugins.datalabels.display).toBe(false);
+    expect(chart.options.plugins.title).toBeUndefined();
+  });
+
+  it('hides the legend', async () => {
+    makeFetchOk();
+    await generateTopSourcesGauges([sources[0]], 10000);
+    const chart = captureChartConfig() as any;
+    expect(chart.options.plugins.legend.display).toBe(false);
   });
 
   it('passes backgroundColor: colors.surface in the QuickChart request body', async () => {
-    await generateTopSourcesChart(sources);
+    makeFetchOk();
+    await generateTopSourcesGauges([sources[0]], 10000);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.backgroundColor).toBe(colors.surface);
   });
 
   it('throws when sources array is empty', async () => {
-    await expect(generateTopSourcesChart([])).rejects.toThrow('sources array is empty');
+    await expect(generateTopSourcesGauges([], 10000)).rejects.toThrow('sources array is empty');
   });
 
   it('propagates error on non-ok QuickChart response', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 500, statusText: 'Internal Server Error' });
-    await expect(generateTopSourcesChart(sources)).rejects.toThrow('QuickChart 500');
+    await expect(generateTopSourcesGauges(sources, 10000)).rejects.toThrow('QuickChart 500');
   });
 });
 
@@ -212,14 +245,14 @@ describe('generateTopPagesChart', () => {
     expect(chart.options.indexAxis).toBeUndefined();
   });
 
-  it('maps page paths to labels', async () => {
+  it('maps pre-computed labels to chart labels', async () => {
     await generateTopPagesChart(pages);
     const chart = captureChartConfig() as any;
-    expect(chart.data.labels[0]).toBe('/');
-    expect(chart.data.labels[1]).toBe('/services');
+    expect(chart.data.labels[0]).toBe('Home');
+    expect(chart.data.labels[1]).toBe('Services');
   });
 
-  it('truncates page path labels longer than 30 chars with ellipsis', async () => {
+  it('truncates labels longer than 30 chars with ellipsis', async () => {
     await generateTopPagesChart(pages);
     const chart = captureChartConfig() as any;
     const truncated: string = chart.data.labels[2];

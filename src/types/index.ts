@@ -55,6 +55,15 @@ export interface DailyMetric {
   newUsers: number;
 }
 
+export interface HistoricalPeriodSnapshot {
+  periodLabel: string;             // short label for bar chart, e.g. "Feb 2"
+  periodStart: string;             // ISO 8601 start date, e.g. "2026-02-02" — used for preset-aware label formatting
+  sessions: number;
+  activeUsers: number;
+  newUsers: number;
+  avgSessionDurationSecs: number;
+}
+
 export interface AnalyticsReport {
   sessions: number;
   activeUsers: number;
@@ -65,6 +74,7 @@ export interface AnalyticsReport {
   dailyMetrics: DailyMetric[];
   resolvedPeriod: ResolvedPeriod;
   isMock: boolean;
+  historicalPeriods?: HistoricalPeriodSnapshot[]; // up to 3 prior periods, oldest first
 }
 
 export interface AnalyticsReportRequestedPayload extends BaseEventPayload {

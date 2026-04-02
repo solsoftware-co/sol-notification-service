@@ -5,10 +5,11 @@ import SalesLeadV1Email from '../emails/templates/sales-lead-v1';
 import AnalyticsReportV1Email from '../emails/templates/analytics-report-v1';
 import {
   generateDailyTrendChart,
-  generateTopSourcesChart,
+  generateTopSourcesGauges,
   generateTopPagesChart,
 } from './charts';
 import { log } from '../utils/logger';
+import type { ReportPeriodPreset } from '../types/index';
 import type {
   FormSubmittedPayload,
   ClientRow,
@@ -18,6 +19,110 @@ import type {
   ResolvedPeriod,
 } from '../types/index';
 import type { StatMetric } from '../emails/templates/analytics-report-v1';
+
+/** Maps a raw GA4 sessionSource value to a human-readable traffic category. */
+export function categorizeSource(source: string): string {
+  const s = source.toLowerCase().trim();
+  if (!s || s === 'direct' || s === '(direct)' || s === '(none)' || s === '(not set)') return 'Direct';
+  const searchEngines = ['google', 'bing', 'yahoo', 'duckduckgo', 'baidu', 'ecosia', 'yandex', 'ask', 'aol', 'brave'];
+  if (searchEngines.includes(s) || s.includes('search')) return 'Search';
+  const socialPlatforms = ['facebook', 'instagram', 'twitter', 'linkedin', 'pinterest', 'tiktok', 'reddit', 'youtube', 'snapchat', 'x.com', 't.co', 'threads', 'whatsapp', 'telegram', 'discord'];
+  if (socialPlatforms.some(p => s === p || s.includes(p))) return 'Social';
+  const emailProviders = ['email', 'newsletter', 'mailchimp', 'klaviyo', 'sendgrid', 'brevo', 'hubspot', 'gmail'];
+  if (emailProviders.some(p => s === p || s.includes(p)) || s.includes('mail')) return 'Email';
+  return 'Referral';
+}
+
+/** Converts a raw URL path to a human-readable page name.
+ *  `/` → "Home", `/neighborhoods/the-preserve` → "The Preserve" */
+export function pageTitle(path: string): string {
+  if (!path || path === '/') return 'Home';
+  const segment = path.split('/').filter(Boolean).pop() ?? path;
+  return segment
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+export function buildReportTitle(preset: ReportPeriodPreset): string {
+  switch (preset) {
+    case 'last_week':    return 'Weekly Analytics Report';
+    case 'last_month':   return 'Monthly Analytics Report';
+    case 'last_30_days': return '30-Day Analytics Report';
+    case 'last_90_days': return '90-Day Analytics Report';
+    case 'custom':       return 'Analytics Report';
+  }
+}
+
+function shortDate(isoDate: string): string {
+  const [, mm, dd] = isoDate.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(mm) - 1]} ${parseInt(dd)}`;
+}
+
+/** Formats an ISO date as a bar-chart label sized for the given preset.
+ *  - last_week / last_30_days  → MM/DD      (e.g. "01/20") — need month+day to tell periods apart
+ *  - last_month                → Mon        (e.g. "Jan")   — single month, name is unambiguous
+ *  - last_90_days              → Mon–Mon    (e.g. "Oct–Dec") — 90-day span; show start + end month
+ *  - custom                    → ""         (history suppressed for custom ranges)
+ */
+function formatBarLabel(isoDate: string, preset: ReportPeriodPreset): string {
+  const [, mm, dd] = isoDate.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  switch (preset) {
+    case 'last_week':
+    case 'last_30_days':
+      return `${mm}/${dd}`;
+    case 'last_month':
+      return months[parseInt(mm) - 1];
+    case 'last_90_days': {
+      const startDate = new Date(isoDate + 'T00:00:00Z');
+      const endDate = new Date(startDate.getTime() + 89 * 86400000);
+      const startMon = months[startDate.getUTCMonth()];
+      const endMon = months[endDate.getUTCMonth()];
+      return startMon === endMon ? startMon : `${startMon}–${endMon}`;
+    }
+    case 'custom':
+      return '';
+  }
+}
+
+function computeChange(current: number, priors: number[]): { pct: number; direction: 'up' | 'down' | 'neutral' } {
+  if (priors.length === 0) return { pct: 0, direction: 'neutral' };
+  const avg = priors.reduce((s, v) => s + v, 0) / priors.length;
+  if (avg === 0) return { pct: 0, direction: 'neutral' };
+  const ratio = (current - avg) / avg;
+  return {
+    pct: Math.round(Math.abs(ratio) * 100),
+    direction: ratio > 0.01 ? 'up' : ratio < -0.01 ? 'down' : 'neutral',
+  };
+}
+
+function buildChangePhrase(
+  metricKey: 'sessions' | 'activeUsers' | 'newUsers' | 'avgDuration',
+  pct: number,
+  direction: 'up' | 'down' | 'neutral',
+): string {
+  if (direction === 'neutral') {
+    const noun = metricKey === 'sessions' ? 'sessions' :
+                 metricKey === 'activeUsers' ? 'active users' :
+                 metricKey === 'newUsers' ? 'new users' : 'session duration';
+    return `consistent ${noun}`;
+  }
+  switch (metricKey) {
+    case 'sessions':    return `${pct}% ${direction === 'up' ? 'more' : 'fewer'} sessions`;
+    case 'activeUsers': return `${pct}% ${direction === 'up' ? 'more' : 'fewer'} active users`;
+    case 'newUsers':    return `${pct}% ${direction === 'up' ? 'more' : 'fewer'} new users`;
+    case 'avgDuration': return `${pct}% ${direction === 'up' ? 'longer' : 'shorter'} average sessions`;
+  }
+}
+
+function buildComparisonLabel(preset: ReportPeriodPreset, count: number): string {
+  const unit = preset === 'last_week'    ? 'week' :
+               preset === 'last_month'   ? 'month' :
+               preset === 'last_30_days' ? '30-day period' :
+               preset === 'last_90_days' ? '90-day period' : 'period';
+  return count === 1 ? `the previous ${unit}` : `the previous ${count} ${unit}s`;
+}
 
 async function loadBannerAttachment(): Promise<EmailAttachment> {
   const content = await readFile(path.join(process.cwd(), 'assets', 'banner_image.png'));
@@ -86,26 +191,44 @@ export async function renderAnalyticsReportEmail(
   const subject = `Your analytics report — ${period.label}`;
   const previewText = `${client.name} — ${period.label}: ${report.sessions.toLocaleString()} sessions`;
 
-  const sessions: StatMetric = {
-    value: report.sessions.toLocaleString(),
-    label: 'SESSIONS',
-    description: `Total sessions — ${period.label}`,
-  };
-  const avgDuration: StatMetric = {
-    value: formatDuration(report.avgSessionDurationSecs),
-    label: 'AVG DURATION',
-    description: 'Average session duration',
-  };
-  const activeUsers: StatMetric = {
-    value: report.activeUsers.toLocaleString(),
-    label: 'ACTIVE USERS',
-    description: `Active users — ${period.label}`,
-  };
-  const newUsers: StatMetric = {
-    value: report.newUsers.toLocaleString(),
-    label: 'NEW USERS',
-    description: `New users — ${period.label}`,
-  };
+  // custom ranges have no meaningful prior-period comparison — suppress history entirely
+  const hp = period.preset === 'custom' ? [] : (report.historicalPeriods ?? []);
+  const compLabel = hp.length > 0 ? buildComparisonLabel(period.preset, hp.length) : undefined;
+  const currentBarLabel = period.preset !== 'custom' ? formatBarLabel(period.start, period.preset) : '';
+
+  function buildMetric(
+    metricKey: 'sessions' | 'activeUsers' | 'newUsers' | 'avgDuration',
+    label: string,
+    sublabel: string,
+    currentVal: number,
+    formattedValue: string,
+  ): StatMetric {
+    if (hp.length === 0) return { value: formattedValue, label, sublabel };
+    const priorVals = hp.map(h =>
+      metricKey === 'sessions'    ? h.sessions :
+      metricKey === 'activeUsers' ? h.activeUsers :
+      metricKey === 'newUsers'    ? h.newUsers : h.avgSessionDurationSecs
+    );
+    const { pct, direction } = computeChange(currentVal, priorVals);
+    return {
+      value: formattedValue,
+      label,
+      sublabel,
+      changePhrase: buildChangePhrase(metricKey, pct, direction),
+      changeDirection: direction,
+      periodLabel: period.label,
+      comparisonLabel: compLabel,
+      bars: [
+        ...hp.map(h => ({ label: formatBarLabel(h.periodStart, period.preset), value: priorVals[hp.indexOf(h)], isCurrent: false })),
+        { label: currentBarLabel, value: currentVal, isCurrent: true },
+      ],
+    };
+  }
+
+  const sessions    = buildMetric('sessions',    'Website Visits',      'Sessions',     report.sessions,               report.sessions.toLocaleString());
+  const avgDuration = buildMetric('avgDuration', 'Avg. Time on Site',   'Avg. Duration', report.avgSessionDurationSecs, formatDuration(report.avgSessionDurationSecs));
+  const activeUsers = buildMetric('activeUsers', 'Total Visitors',      'Active Users', report.activeUsers,            report.activeUsers.toLocaleString());
+  const newUsers    = buildMetric('newUsers',    'First-Time Visitors', 'New Users',    report.newUsers,               report.newUsers.toLocaleString());
 
   // Generate charts independently — each fails gracefully without blocking the others
   let dailyChartBuf: Buffer | null = null;
@@ -115,16 +238,35 @@ export async function renderAnalyticsReportEmail(
     log(`[charts] daily trend chart failed: ${e}`);
   }
 
-  let sourcesChartBuf: Buffer | null = null;
+  // Aggregate raw sources into categories for the pie chart.
+  // The topSources list is only the top N sources, so we add an "Other" slice
+  // for the remaining sessions so that 100% of the pie = total site traffic.
+  const categoryTotals: Record<string, number> = {};
+  for (const s of report.topSources) {
+    const cat = categorizeSource(s.source);
+    categoryTotals[cat] = (categoryTotals[cat] ?? 0) + s.sessions;
+  }
+  const totalCategorized = Object.values(categoryTotals).reduce((sum, v) => sum + v, 0);
+  const categoryAggregates = Object.entries(categoryTotals)
+    .map(([label, sessions]) => ({ label, sessions }))
+    .sort((a, b) => b.sessions - a.sessions);
+  const otherSessions = report.sessions - totalCategorized;
+  if (otherSessions > 0) {
+    categoryAggregates.push({ label: 'Other', sessions: otherSessions });
+  }
+
+  let sourcesGaugeBufs: Buffer[] = [];
   try {
-    sourcesChartBuf = await generateTopSourcesChart(report.topSources);
+    sourcesGaugeBufs = await generateTopSourcesGauges(categoryAggregates, report.sessions);
   } catch (e) {
-    log(`[charts] top sources chart failed: ${e}`);
+    log(`[charts] top sources gauges failed: ${e}`);
   }
 
   let pagesChartBuf: Buffer | null = null;
   try {
-    pagesChartBuf = await generateTopPagesChart(report.topPages);
+    pagesChartBuf = await generateTopPagesChart(
+      report.topPages.map(p => ({ label: pageTitle(p.path), views: p.views })),
+    );
   } catch (e) {
     log(`[charts] top pages chart failed: ${e}`);
   }
@@ -138,14 +280,14 @@ export async function renderAnalyticsReportEmail(
       content_type: 'image/png',
     });
   }
-  if (sourcesChartBuf) {
+  sourcesGaugeBufs.forEach((buf, i) => {
     attachments.push({
-      filename: 'chart_sources.png',
-      content: sourcesChartBuf.toString('base64'),
-      content_id: 'chart_sources',
+      filename: `chart_sources_${i}.png`,
+      content: buf.toString('base64'),
+      content_id: `chart_sources_${i}`,
       content_type: 'image/png',
     });
-  }
+  });
   if (pagesChartBuf) {
     attachments.push({
       filename: 'chart_pages.png',
@@ -159,7 +301,7 @@ export async function renderAnalyticsReportEmail(
     AnalyticsReportV1Email({
       previewText,
       subheader: client.name,
-      header: 'Weekly Analytics Report',
+      header: buildReportTitle(period.preset),
       periodLabel: period.label,
       sessions,
       avgDuration,
@@ -167,9 +309,11 @@ export async function renderAnalyticsReportEmail(
       newUsers,
       topSources: report.topSources.map((s) => ({
         source: s.source,
+        category: categorizeSource(s.source),
         sessions: s.sessions.toLocaleString(),
       })),
       topPages: report.topPages.map((p) => ({
+        name: pageTitle(p.path),
         path: p.path,
         views: p.views.toLocaleString(),
       })),
@@ -180,7 +324,16 @@ export async function renderAnalyticsReportEmail(
         newUsers: d.newUsers.toLocaleString(),
       })),
       dailyChart: dailyChartBuf ? 'cid:chart_daily' : undefined,
-      sourcesChart: sourcesChartBuf ? 'cid:chart_sources' : undefined,
+      sourcesGauges: sourcesGaugeBufs.length > 0
+        ? sourcesGaugeBufs.map((_, i) => ({
+            cid: `cid:chart_sources_${i}`,
+            label: categoryAggregates[i]?.label ?? '',
+            pct: categoryAggregates[i]
+              ? Math.round(categoryAggregates[i].sessions / report.sessions * 100)
+              : 0,
+            sessions: (categoryAggregates[i]?.sessions ?? 0).toLocaleString(),
+          }))
+        : undefined,
       pagesChart: pagesChartBuf ? 'cid:chart_pages' : undefined,
     }),
   );

@@ -5,9 +5,13 @@ type DataTableProps = {
     title?: string;
     columns: string[];
     rows: string[][];
+    /** Per-column alignment. Defaults to left for col 0, right for all others. */
+    align?: Array<'left' | 'right'>;
 };
 
-export function DataTable({ title, columns, rows }: DataTableProps) {
+export function DataTable({ title, columns, rows, align }: DataTableProps) {
+    const colAlign = (i: number): 'left' | 'right' =>
+        align ? (align[i] ?? 'right') : (i === 0 ? 'left' : 'right');
     return (
         <div>
             {title && (
@@ -40,7 +44,7 @@ export function DataTable({ title, columns, rows }: DataTableProps) {
                                     color: colors.textMuted,
                                     letterSpacing: typography.letterSpacing.label,
                                     textTransform: 'uppercase',
-                                    textAlign: i === 0 ? 'left' : 'right',
+                                    textAlign: colAlign(i),
                                     padding: '10px 12px',
                                     borderBottom: borders.tableRow,
                                 }}
@@ -61,7 +65,7 @@ export function DataTable({ title, columns, rows }: DataTableProps) {
                                         fontSize: '14px',
                                         fontWeight: typography.weights.regular,
                                         color: colors.textPrimary,
-                                        textAlign: ci === 0 ? 'left' : 'right',
+                                        textAlign: colAlign(ci),
                                         padding: '10px 12px',
                                         borderBottom: borders.tableRow,
                                     }}
