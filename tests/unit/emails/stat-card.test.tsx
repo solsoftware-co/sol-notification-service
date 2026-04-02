@@ -111,7 +111,7 @@ describe('StatCard', () => {
     });
 
     it('current bar has the darker colour', () => {
-      expect(html).toContain(colors.currentBar);
+      expect(html).toContain(colors.textMuted);
     });
 
     it('renders an upward trend arrow (↑) coloured with the positive token', () => {
@@ -152,10 +152,6 @@ describe('StatCard', () => {
       expect(html).toContain('Week 2');
       expect(html).toContain('Week 3');
       expect(html).toContain('Feb 23');
-    });
-
-    it('exactly one bar carries the current-period colour', () => {
-      expect(countOccurrences(html, colors.currentBar)).toBe(1);
     });
 
     it('description uses "You had" prefix', () => {

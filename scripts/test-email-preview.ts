@@ -93,9 +93,9 @@ async function previewAnalytics() {
       { date: '2026-03-01', sessions: 1740, activeUsers: 1250, newUsers: 115 },
     ],
     historicalPeriods: [
-      { periodLabel: 'Feb 2',  sessions: 9800,  activeUsers: 7100, newUsers: 980,  avgSessionDurationSecs: 138 },
-      { periodLabel: 'Feb 9',  sessions: 10950, activeUsers: 7800, newUsers: 1050, avgSessionDurationSecs: 145 },
-      { periodLabel: 'Feb 16', sessions: 11200, activeUsers: 8200, newUsers: 1100, avgSessionDurationSecs: 149 },
+      { periodLabel: 'Feb 2',  periodStart: '2026-02-02', sessions: 9800,  activeUsers: 7100, newUsers: 980,  avgSessionDurationSecs: 138 },
+      { periodLabel: 'Feb 9',  periodStart: '2026-02-09', sessions: 10950, activeUsers: 7800, newUsers: 1050, avgSessionDurationSecs: 145 },
+      { periodLabel: 'Feb 16', periodStart: '2026-02-16', sessions: 11200, activeUsers: 8200, newUsers: 1100, avgSessionDurationSecs: 149 },
     ],
   };
 

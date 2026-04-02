@@ -180,12 +180,12 @@ describe('generateTopSourcesGauges', () => {
     expect(chart.data.datasets[0].data[1]).toBe(52); // remainder
   });
 
-  it('uses colors.currentBar for the filled arc and colors.border for the background arc', async () => {
+  it('uses colors.textMuted for the filled arc and colors.border for the background arc', async () => {
     makeFetchOk();
     await generateTopSourcesGauges([sources[0]], 10000);
     const chart = captureChartConfig() as any;
     const bg: string[] = chart.data.datasets[0].backgroundColor;
-    expect(bg[0]).toBe(colors.currentBar);
+    expect(bg[0]).toBe(colors.textMuted);
     expect(bg[1]).toBe(colors.border);
   });
 

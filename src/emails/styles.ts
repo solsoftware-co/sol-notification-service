@@ -7,7 +7,6 @@ export const colors = {
   surface:       '#FFFFFF',  // card / content block background
   shading:       '#FBFBFC',  // subtle background shading
   border:        '#E4E4E7',  // card borders, dividers, table row separators
-  currentBar:    '#5E5E68',
   textPrimary:   '#36363B',  // headings, stat numbers, field values
   textSecondary: '#52525B',  // body text, descriptions, context lines
   textMuted:     '#A1A1AA',  // footer, field labels, metadata

@@ -170,7 +170,7 @@ async function generateCategoryGauge(sessions: number, totalSessions: number): P
         datasets: [
           {
             data: [pct, remaining],
-            backgroundColor: [colors.currentBar, colors.border],
+            backgroundColor: [colors.textMuted, colors.border],
             borderWidth: 0,
             borderRadius: 6,
           },
