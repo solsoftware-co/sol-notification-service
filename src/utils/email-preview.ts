@@ -83,5 +83,16 @@ function openInBrowser(filePath: string): void {
 export function writeEmailPreview(options: PreviewOptions): void {
   mkdirSync(PREVIEW_DIR, { recursive: true });
   writeFileSync(PREVIEW_FILE, buildPreviewPage(options), "utf-8");
+
+  // Write downloadable attachments (no content_id = not an inline CID image) to disk
+  // so developers can open them directly without needing a deployed environment.
+  for (const att of options.attachments ?? []) {
+    if (att.content_id) continue;
+    const content = Buffer.isBuffer(att.content)
+      ? att.content
+      : Buffer.from(att.content, "base64");
+    writeFileSync(join(PREVIEW_DIR, att.filename), content);
+  }
+
   openInBrowser(PREVIEW_FILE);
 }

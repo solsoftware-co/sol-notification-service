@@ -6,6 +6,8 @@ const mockGenerateDailyTrendChart = vi.hoisted(() => vi.fn());
 const mockGenerateTopSourcesGauges = vi.hoisted(() => vi.fn());
 const mockGenerateTopPagesChart = vi.hoisted(() => vi.fn());
 const mockAnalyticsReportEmailFn = vi.hoisted(() => vi.fn());
+const mockBuildAnalyticsExcel = vi.hoisted(() => vi.fn());
+const mockBuildExcelFilename = vi.hoisted(() => vi.fn());
 
 vi.mock('node:fs/promises', () => ({
   readFile: mockReadFile,
@@ -36,6 +38,11 @@ vi.mock('../../../src/lib/charts', () => ({
 
 vi.mock('../../../src/emails/templates/analytics-report-v1', () => ({
   default: mockAnalyticsReportEmailFn,
+}));
+
+vi.mock('../../../src/lib/excel', () => ({
+  buildAnalyticsExcel: mockBuildAnalyticsExcel,
+  buildExcelFilename: mockBuildExcelFilename,
 }));
 
 import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle, pageTitle, categorizeSource } from '../../../src/lib/templates';
@@ -95,6 +102,8 @@ beforeEach(() => {
   mockGenerateTopSourcesGauges.mockResolvedValue([mockChartBuffer, mockChartBuffer, mockChartBuffer]);
   mockGenerateTopPagesChart.mockResolvedValue(mockChartBuffer);
   mockAnalyticsReportEmailFn.mockReturnValue({ type: 'div', props: {} });
+  mockBuildAnalyticsExcel.mockResolvedValue(Buffer.from('fake-xlsx'));
+  mockBuildExcelFilename.mockReturnValue('analytics-acme-corp-2026-02-16-2026-02-22.xlsx');
 });
 
 // ---------------------------------------------------------------------------
@@ -258,14 +267,15 @@ describe('renderAnalyticsReportEmail', () => {
     expect(result.html.length).toBeGreaterThan(0);
   });
 
-  it('returns 4 attachments (banner + 3 charts) when all chart data is present', async () => {
+  it('returns 7 attachments (banner + 3 source gauges + daily + pages + xlsx) when all succeed', async () => {
     const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
-    expect(result.attachments).toHaveLength(6);
+    expect(result.attachments).toHaveLength(7);
     const filenames = result.attachments.map(a => a.filename);
     expect(filenames).toContain('banner_image.png');
     expect(filenames).toContain('chart_daily.png');
     expect(filenames).toContain('chart_sources_0.png');
     expect(filenames).toContain('chart_pages.png');
+    expect(filenames).toContain('analytics-acme-corp-2026-02-16-2026-02-22.xlsx');
   });
 
   it('omits sources chart when topSources is empty (graceful fallback)', async () => {
@@ -280,15 +290,16 @@ describe('renderAnalyticsReportEmail', () => {
     expect(filenames).toContain('chart_pages.png');
   });
 
-  it('returns 3 attachments when one chart fn throws', async () => {
+  it('returns 4 attachments when one chart fn throws (banner + daily + pages + xlsx)', async () => {
     mockGenerateTopSourcesGauges.mockRejectedValue(new Error('QuickChart 500'));
     const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
-    expect(result.attachments).toHaveLength(3);
+    expect(result.attachments).toHaveLength(4);
     const filenames = result.attachments.map(a => a.filename);
     expect(filenames).not.toContain('chart_sources.png');
     expect(filenames).toContain('banner_image.png');
     expect(filenames).toContain('chart_daily.png');
     expect(filenames).toContain('chart_pages.png');
+    expect(filenames).toContain('analytics-acme-corp-2026-02-16-2026-02-22.xlsx');
   });
 
   it('banner attachment has content_id and no headers field', async () => {
@@ -306,6 +317,24 @@ describe('renderAnalyticsReportEmail', () => {
     expect(daily.content_id).toBe('chart_daily');
     expect(sources0.content_id).toBe('chart_sources_0');
     expect(pages.content_id).toBe('chart_pages');
+  });
+
+  it('xlsx attachment has correct filename and content_type', async () => {
+    const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
+    const xlsx = result.attachments.find(a => a.filename.endsWith('.xlsx'))!;
+    expect(xlsx).toBeDefined();
+    expect(xlsx.filename).toBe('analytics-acme-corp-2026-02-16-2026-02-22.xlsx');
+    expect(xlsx.content_type).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(xlsx.content).toEqual(Buffer.from('fake-xlsx'));
+  });
+
+  it('still resolves successfully when buildAnalyticsExcel rejects (non-blocking failure)', async () => {
+    mockBuildAnalyticsExcel.mockRejectedValue(new Error('out of memory'));
+    const result = await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
+    expect(result.html).toBeDefined();
+    const filenames = result.attachments.map(a => a.filename);
+    expect(filenames).not.toContain('analytics-acme-corp-2026-02-16-2026-02-22.xlsx');
+    expect(filenames).toContain('banner_image.png');
   });
 
   it('returns a previewText containing the session count', async () => {
