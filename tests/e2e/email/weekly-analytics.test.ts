@@ -64,9 +64,15 @@ describe("Weekly Analytics Email — End-to-End", () => {
   });
 
   it("includes the analytics chart as an inline attachment", () => {
-    const chart = attachments.find((a) => a.filename.match(/chart|graph|analytics/i));
+    const chart = attachments.find((a) => a.filename.match(/chart|graph/i));
     expect(chart).toBeDefined();
     expect(chart?.content_type).toMatch(/image/);
+  });
+
+  it("includes the Excel spreadsheet as a downloadable attachment", () => {
+    const xlsx = attachments.find((a) => a.filename.match(/\.xlsx$/i));
+    expect(xlsx).toBeDefined();
+    expect(xlsx?.content_type).toMatch(/spreadsheet|openxmlformats/i);
   });
 
   // Banner attachment assertion
