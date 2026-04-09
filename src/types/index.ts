@@ -136,7 +136,7 @@ export interface EmailRenderResult {
 }
 
 export interface EmailRequest {
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
   from?: string;
@@ -145,8 +145,8 @@ export interface EmailRequest {
 
 export interface EmailResult {
   mode: EmailMode;
-  originalTo: string;
-  actualTo: string;
+  originalTo: string | string[];
+  actualTo: string | string[];
   subject: string;
   outcome: "sent" | "logged";
   resendId?: string;

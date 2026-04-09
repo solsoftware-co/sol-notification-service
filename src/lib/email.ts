@@ -14,11 +14,22 @@ function getResendClient(): Resend {
   return new Resend(config.resendApiKey);
 }
 
-function validateRecipient(to: string): void {
-  if (!to || !to.includes("@")) {
-    throw new Error(
-      `Invalid email recipient: "${to}" — must be non-empty and contain "@"`
-    );
+function validateRecipient(to: string | string[]): void {
+  if (Array.isArray(to)) {
+    if (to.length === 0) {
+      throw new Error(`Invalid email recipient: empty array — must contain at least one address`);
+    }
+    for (const addr of to) {
+      if (!addr || !addr.includes("@")) {
+        throw new Error(`Invalid email recipient: "${addr}" — must be non-empty and contain "@"`);
+      }
+    }
+  } else {
+    if (!to || !to.includes("@")) {
+      throw new Error(
+        `Invalid email recipient: "${to}" — must be non-empty and contain "@"`
+      );
+    }
   }
 }
 
@@ -28,9 +39,11 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   const from = request.from ?? config.resendFrom;
   const mode = config.emailMode;
 
+  const toLabel = Array.isArray(request.to) ? request.to.join(", ") : request.to;
+
   if (mode === "mock") {
-    log(`[mock] Would send to: ${request.to} | Subject: ${request.subject} | Body length: ${request.html.length} chars`);
-    writeEmailPreview({ to: request.to, subject: request.subject, html: request.html, attachments: request.attachments });
+    log(`[mock] Would send to: ${toLabel} | Subject: ${request.subject} | Body length: ${request.html.length} chars`);
+    writeEmailPreview({ to: toLabel, subject: request.subject, html: request.html, attachments: request.attachments });
     return {
       mode,
       originalTo: request.to,
@@ -41,7 +54,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   }
 
   if (mode === "mailtrap") {
-    const subject = `[TEST: ${request.to}] ${request.subject}`;
+    const subject = `[TEST: ${toLabel}] ${request.subject}`;
     const transport = nodemailer.createTransport({
       host: "sandbox.smtp.mailtrap.io",
       port: 2525,
@@ -63,7 +76,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
       html: request.html,
       ...(attachments?.length ? { attachments } : {}),
     });
-    log(`[mailtrap] Sent to: ${request.to} | Subject: ${subject}`);
+    log(`[mailtrap] Sent to: ${toLabel} | Subject: ${subject}`);
     return {
       mode,
       originalTo: request.to,
@@ -77,7 +90,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
     mode === "test" ? config.testEmail! : request.to;
   const subject =
     mode === "test"
-      ? `[TEST: ${request.to}] ${request.subject}`
+      ? `[TEST: ${toLabel}] ${request.subject}`
       : request.subject;
 
   const resend = getResendClient();
@@ -105,9 +118,9 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   }
 
   if (mode === "test") {
-    log(`[test] Redirected to: ${actualTo} (original: ${request.to}) | Subject: ${subject}`);
+    log(`[test] Redirected to: ${actualTo} (original: ${toLabel}) | Subject: ${subject}`);
   } else {
-    log(`[live] Sent to: ${request.to} | Resend ID: ${data!.id}`);
+    log(`[live] Sent to: ${toLabel} | Resend ID: ${data!.id}`);
   }
 
   return {

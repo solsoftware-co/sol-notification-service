@@ -2,8 +2,9 @@ import { inngest } from "../client";
 import { config } from "../../lib/config";
 import { getClientById, writeNotificationLog } from "../../lib/db";
 import { sendEmail } from "../../lib/email";
+import { resolveRecipients } from "../../lib/notifications";
 import { renderFormNotificationEmail } from "../../lib/templates";
-import { log, logError } from "../../utils/logger";
+import { log } from "../../utils/logger";
 import type { FormSubmittedPayload } from "../../types/index";
 
 const REQUIRED_FIELDS: (keyof FormSubmittedPayload)[] = [
@@ -38,9 +39,10 @@ export const sendFormNotification = inngest.createFunction(
     });
 
     const result = await step.run("send-email", async () => {
+      const recipients = resolveRecipients(client, "form_submitted");
       const rendered = await renderFormNotificationEmail(data, client);
       return sendEmail({
-        to: client.email,
+        to: recipients,
         subject: rendered.subject,
         html: rendered.html,
         attachments: rendered.attachments,
@@ -55,12 +57,15 @@ export const sendFormNotification = inngest.createFunction(
         originalTo: result.originalTo,
       });
       if (config.emailMode === "live") {
+        const recipientEmail = Array.isArray(result.originalTo)
+          ? result.originalTo.join(", ")
+          : result.originalTo;
         await writeNotificationLog({
           client_id: clientId,
           workflow: "send-form-notification",
           event_name: "form/submitted",
           outcome: result.outcome === "sent" ? "sent" : "failed",
-          recipient_email: result.originalTo,
+          recipient_email: recipientEmail,
           subject: result.subject,
           resend_id: result.resendId,
           metadata: { formData: data },

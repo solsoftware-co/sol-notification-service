@@ -4,6 +4,7 @@ import type { ClientRow, EmailResult } from "../../../../src/types/index";
 // Hoisted mock refs — declared before vi.mock() factories
 const mockRenderFormNotification = vi.hoisted(() => vi.fn());
 const mockWriteNotificationLog = vi.hoisted(() => vi.fn());
+const mockResolveRecipients = vi.hoisted(() => vi.fn());
 
 // T006: Mock declarations — hoisted above all imports by Vitest
 // config MUST be first to prevent throw-at-import from buildConfig()
@@ -27,6 +28,10 @@ vi.mock("../../../../src/lib/email", () => ({
   sendEmail: vi.fn(),
 }));
 
+vi.mock("../../../../src/lib/notifications", () => ({
+  resolveRecipients: mockResolveRecipients,
+}));
+
 vi.mock("../../../../src/lib/templates", () => ({
   renderFormNotificationEmail: mockRenderFormNotification,
 }));
@@ -41,6 +46,7 @@ vi.mock("../../../../src/utils/logger", () => ({
 import { sendFormNotification } from "../../../../src/inngest/functions/form-notification";
 import { getClientById } from "../../../../src/lib/db";
 import { sendEmail } from "../../../../src/lib/email";
+import { resolveRecipients } from "../../../../src/lib/notifications";
 import { config } from "../../../../src/lib/config";
 
 // ---------------------------------------------------------------------------
@@ -70,16 +76,16 @@ const mockClient: ClientRow = {
 
 const mockEmailResult: EmailResult = {
   mode: "mock",
-  originalTo: "owner@acme.com",
-  actualTo: "owner@acme.com",
+  originalTo: ["owner@acme.com"],
+  actualTo: ["owner@acme.com"],
   subject: "New inquiry — Acme Corp",
   outcome: "logged",
 };
 
 const mockLiveEmailResult: EmailResult = {
   mode: "live",
-  originalTo: "owner@acme.com",
-  actualTo: "owner@acme.com",
+  originalTo: ["owner@acme.com"],
+  actualTo: ["owner@acme.com"],
   subject: "New inquiry — Acme Corp",
   outcome: "sent",
   resendId: "resend-xyz789",
@@ -120,6 +126,8 @@ beforeEach(() => {
   vi.resetAllMocks();
   (config as any).emailMode = "mock"; // reset to default before each test
   mockRenderFormNotification.mockResolvedValue(mockRenderResult);
+  // Default: no preferences configured — resolveRecipients falls back to client.email
+  mockResolveRecipients.mockReturnValue(["owner@acme.com"]);
 });
 
 // ---------------------------------------------------------------------------
@@ -221,7 +229,7 @@ describe("send-email", () => {
     expect(sendEmail).toHaveBeenCalledOnce();
     expect(sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: "owner@acme.com",
+        to: ["owner@acme.com"],
         subject: "New inquiry — Acme Corp",
       })
     );
@@ -236,6 +244,44 @@ describe("send-email", () => {
 
     expect(output.step.op).toBe("StepRun");
     expect(output.step.data).toEqual(mockEmailResult);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe("send-email — notification preferences", () => {
+  beforeEach(() => {
+    vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
+  });
+
+  it("uses the configured form_submitted recipient list when preferences are set", async () => {
+    const preferenceList = ["sales@acme.com", "manager@acme.com"];
+    mockResolveRecipients.mockReturnValue(preferenceList);
+
+    const tWithClient = t.clone({
+      steps: [{ id: "fetch-client-config", handler: () => mockClient }],
+    });
+
+    await tWithClient.executeStep("send-email");
+
+    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "form_submitted");
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: ["sales@acme.com", "manager@acme.com"] })
+    );
+  });
+
+  it("falls back to [client.email] when no preference is configured", async () => {
+    mockResolveRecipients.mockReturnValue(["owner@acme.com"]);
+
+    const tWithClient = t.clone({
+      steps: [{ id: "fetch-client-config", handler: () => mockClient }],
+    });
+
+    await tWithClient.executeStep("send-email");
+
+    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "form_submitted");
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: ["owner@acme.com"] })
+    );
   });
 });
 
@@ -275,7 +321,7 @@ describe("log-result — emailMode live", () => {
         workflow: "send-form-notification",
         event_name: "form/submitted",
         outcome: "sent",
-        recipient_email: "owner@acme.com",
+        recipient_email: "owner@acme.com", // joined from ["owner@acme.com"]
         subject: "New inquiry — Acme Corp",
         resend_id: "resend-xyz789",
         metadata: expect.objectContaining({

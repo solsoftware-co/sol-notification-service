@@ -3,6 +3,7 @@ import { config } from "../../lib/config";
 import { getClientById, writeNotificationLog } from "../../lib/db";
 import { getAnalyticsReport } from "../../lib/analytics";
 import { sendEmail } from "../../lib/email";
+import { resolveRecipients } from "../../lib/notifications";
 import { renderAnalyticsReportEmail, buildReportTitle } from "../../lib/templates";
 import { log } from "../../utils/logger";
 import type {
@@ -158,9 +159,10 @@ export const sendAnalyticsReport = inngest.createFunction(
     });
 
     const result = await step.run("send-email", async () => {
+      const recipients = resolveRecipients(client, "analytics_report");
       const rendered = await renderAnalyticsReportEmail(report, client, resolvedPeriod);
       return sendEmail({
-        to: client.email,
+        to: recipients,
         subject: rendered.subject,
         html: rendered.html,
         attachments: rendered.attachments,
@@ -178,12 +180,15 @@ export const sendAnalyticsReport = inngest.createFunction(
         isMock: report.isMock,
       } as any);
       if (config.emailMode === "live") {
+        const recipientEmail = Array.isArray(result.originalTo)
+          ? result.originalTo.join(", ")
+          : result.originalTo;
         await writeNotificationLog({
           client_id: clientId,
           workflow: "send-analytics-report",
           event_name: "analytics/report.requested",
           outcome: result.outcome === "sent" ? "sent" : "failed",
-          recipient_email: result.originalTo,
+          recipient_email: recipientEmail,
           subject: result.subject,
           resend_id: result.resendId,
           metadata: {

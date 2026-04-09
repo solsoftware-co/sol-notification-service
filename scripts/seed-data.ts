@@ -7,7 +7,14 @@ const clients = [
     email: "test-acme@example.com",
     ga4_property_id: "123456789", // numeric ID only — analytics.ts prefixes "properties/" internally
     active: true,
-    settings: {},
+    settings: {
+      notifications: {
+        // form_submitted: two recipients — exercises multi-recipient send path
+        form_submitted: ["sales-test@acme-test.com", "owner-test@acme-test.com"],
+        // analytics_report: one recipient — exercises single-item list path
+        analytics_report: ["marketing-test@acme-test.com"],
+      },
+    },
   },
   {
     id: "client-globex",
@@ -15,7 +22,7 @@ const clients = [
     email: "test-globex@example.com",
     ga4_property_id: null, // intentionally no GA4 — tests the "not configured" error path
     active: true,
-    settings: {},
+    settings: {}, // no notifications key — exercises the client.email fallback path
   },
 ];
 
@@ -28,7 +35,8 @@ async function seed(): Promise<void> {
        VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (id) DO UPDATE SET
          ga4_property_id = EXCLUDED.ga4_property_id,
-         active = EXCLUDED.active`,
+         active = EXCLUDED.active,
+         settings = EXCLUDED.settings`,
       [
         client.id,
         client.name,

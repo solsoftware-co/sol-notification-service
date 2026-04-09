@@ -5,6 +5,7 @@ const mockGetAnalyticsReport = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockRenderAnalyticsReport = vi.hoisted(() => vi.fn());
 const mockWriteNotificationLog = vi.hoisted(() => vi.fn());
+const mockResolveRecipients = vi.hoisted(() => vi.fn());
 
 // config MUST be mocked first to prevent throw-at-import from buildConfig()
 vi.mock("../../../../src/lib/config", () => ({
@@ -32,6 +33,10 @@ vi.mock("../../../../src/lib/email", () => ({
   sendEmail: mockSendEmail,
 }));
 
+vi.mock("../../../../src/lib/notifications", () => ({
+  resolveRecipients: mockResolveRecipients,
+}));
+
 vi.mock("../../../../src/lib/templates", async () => {
   const actual = await vi.importActual<typeof import("../../../../src/lib/templates")>("../../../../src/lib/templates");
   return {
@@ -48,6 +53,7 @@ vi.mock("../../../../src/utils/logger", () => ({
 
 import { InngestTestEngine, mockCtx } from "@inngest/test";
 import { sendAnalyticsReport } from "../../../../src/inngest/functions/analytics-report";
+import { resolveRecipients } from "../../../../src/lib/notifications";
 import { config } from "../../../../src/lib/config";
 import type {
   ClientRow,
@@ -94,16 +100,16 @@ const mockReport: AnalyticsReport = {
 
 const mockEmailResult: EmailResult = {
   mode: "mock",
-  originalTo: "client@example.com",
-  actualTo: "client@example.com",
+  originalTo: ["client@example.com"],
+  actualTo: ["client@example.com"],
   subject: "Your analytics report \u2014 Feb 16 \u2013 Feb 22, 2026",
   outcome: "logged",
 };
 
 const mockLiveEmailResult: EmailResult = {
   mode: "live",
-  originalTo: "client@example.com",
-  actualTo: "client@example.com",
+  originalTo: ["client@example.com"],
+  actualTo: ["client@example.com"],
   subject: "Your analytics report \u2014 Feb 16 \u2013 Feb 22, 2026",
   outcome: "sent",
   resendId: "resend-abc123",
@@ -148,6 +154,8 @@ beforeEach(() => {
     html: "<html>mock</html>",
     attachments: [],
   });
+  // Default: no preferences configured — resolveRecipients falls back to client.email
+  mockResolveRecipients.mockReturnValue(["client@example.com"]);
 });
 
 // ---------------------------------------------------------------------------
@@ -443,14 +451,59 @@ describe("full execute — happy path, last_week", () => {
     );
   });
 
-  it("calls sendEmail with client email and resolved period label in subject", async () => {
+  it("calls sendEmail with resolved recipients and resolved period label in subject", async () => {
     await t.execute();
 
     expect(mockSendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: "client@example.com",
+        to: ["client@example.com"],
         subject: expect.stringContaining("Feb 16 \u2013 Feb 22, 2026"),
       })
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Notification preferences — analytics_report key
+// ---------------------------------------------------------------------------
+
+describe("send-email — notification preferences", () => {
+  it("uses the configured analytics_report recipient list when preferences are set", async () => {
+    const preferenceList = ["marketing@example.com", "cmo@example.com"];
+    mockResolveRecipients.mockReturnValue(preferenceList);
+
+    const tWithClient = t.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-report-period", handler: () => mockResolvedPeriod },
+        { id: "fetch-analytics-data", handler: () => mockReport },
+      ],
+    });
+
+    await tWithClient.executeStep("send-email");
+
+    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "analytics_report");
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: ["marketing@example.com", "cmo@example.com"] })
+    );
+  });
+
+  it("falls back to [client.email] when no analytics_report preference is configured", async () => {
+    mockResolveRecipients.mockReturnValue(["client@example.com"]);
+
+    const tWithClient = t.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-report-period", handler: () => mockResolvedPeriod },
+        { id: "fetch-analytics-data", handler: () => mockReport },
+      ],
+    });
+
+    await tWithClient.executeStep("send-email");
+
+    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "analytics_report");
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: ["client@example.com"] })
     );
   });
 });
