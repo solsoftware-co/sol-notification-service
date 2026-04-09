@@ -32,6 +32,8 @@ jobs:
             shared:
               - 'src/lib/email.ts'
               - 'src/lib/config.ts'
+              - 'src/lib/templates.ts'
+              - 'src/lib/excel.ts'
               - 'src/inngest/functions/index.ts'
               - 'src/types/index.ts'
 

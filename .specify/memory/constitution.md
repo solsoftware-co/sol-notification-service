@@ -167,6 +167,7 @@ constitution amendment (MINOR bump minimum; MAJOR if a core service is replaced)
 | Logging | pino | ^9.x |
 | Logging (dev pretty-print) | pino-pretty | devDep |
 | Log transport | @logtail/pino | ^3.x |
+| Excel generation | xlsx (SheetJS Community Edition, Apache 2.0) | ^0.18.x |
 | Log management | Better Stack | Free plan |
 | E2E test email inbox | mailtrap (devDep, CI only) | ^4.x |
 
@@ -251,4 +252,4 @@ gates in `plan-template.md` before merge. Violations of Principle VI (unapproved
 infrastructure) MUST be justified in the plan's Complexity Tracking table with explicit
 rationale for why no simpler approach exists.
 
-**Version**: 1.1.1 | **Ratified**: 2026-02-13 | **Last Amended**: 2026-03-07
+**Version**: 1.2.0 | **Ratified**: 2026-02-13 | **Last Amended**: 2026-04-08

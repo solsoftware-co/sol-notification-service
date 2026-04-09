@@ -8,6 +8,7 @@ import {
   generateTopSourcesGauges,
   generateTopPagesChart,
 } from './charts';
+import { buildAnalyticsExcel, buildExcelFilename } from './excel';
 import { log } from '../utils/logger';
 import type { ReportPeriodPreset } from '../types/index';
 import type {
@@ -294,6 +295,21 @@ export async function renderAnalyticsReportEmail(
       content: pagesChartBuf.toString('base64'),
       content_id: 'chart_pages',
       content_type: 'image/png',
+    });
+  }
+
+  // Generate Excel attachment — non-blocking: failure logs a warning but never prevents email send
+  let excelBuf: Buffer | null = null;
+  try {
+    excelBuf = await buildAnalyticsExcel(report, client, period);
+  } catch (e) {
+    log(`[excel] workbook generation failed: ${e}`);
+  }
+  if (excelBuf) {
+    attachments.push({
+      filename: buildExcelFilename(client, period),
+      content: excelBuf,
+      content_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
   }
 

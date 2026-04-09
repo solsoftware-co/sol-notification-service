@@ -104,6 +104,15 @@ async function previewAnalytics() {
   writeFileSync(filePath, inlineImages(rendered.html, rendered.attachments), 'utf-8');
   openInBrowser(filePath);
   console.log('Analytics preview written → .email-preview/analytics.html');
+
+  // Write downloadable attachments (no content_id = not an inline image) to disk
+  for (const att of rendered.attachments) {
+    if (att.content_id) continue;
+    const content = Buffer.isBuffer(att.content) ? att.content : Buffer.from(att.content, 'base64');
+    const attPath = join(PREVIEW_DIR, att.filename);
+    writeFileSync(attPath, content);
+    console.log(`Attachment written  → .email-preview/${att.filename}`);
+  }
 }
 
 async function main() {
