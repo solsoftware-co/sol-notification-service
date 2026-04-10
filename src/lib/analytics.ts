@@ -224,8 +224,8 @@ export async function getAnalyticsReport(
   period: ResolvedPeriod,
   options: AnalyticsReportOptions = {}
 ): Promise<AnalyticsReport> {
-  if (!config.ga4CredentialsJson) {
-    log("[analytics] GA4_SERVICE_ACCOUNT_JSON not set — returning mock data");
+  if (!config.ga4CredentialsJson || !propertyId) {
+    log("[analytics] GA4 not fully configured (missing credentials or property ID) — returning mock data");
     return mockReport(period);
   }
 
