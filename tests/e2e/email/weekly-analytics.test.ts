@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { triggerFlow } from "./helpers/inngest";
+import { triggerFlow, waitForRunCompletion } from "./helpers/inngest";
 import { waitForEmail, getEmailAttachments, type MailtrapMessage, type Attachment } from "./helpers/mailtrap";
 import { FLOW_MAP } from "./flow-map";
 
@@ -11,7 +11,8 @@ describe("Weekly Analytics Email — End-to-End", () => {
 
   beforeAll(async () => {
     const triggeredAt = new Date();
-    await triggerFlow(flow.event, flow.eventData);
+    const eventId = await triggerFlow(flow.event, flow.eventData);
+    await waitForRunCompletion(eventId);
     email = await waitForEmail(/\[TEST:.*\].*(?:analytics|report)/i, triggeredAt);
     attachments = await getEmailAttachments(email.id);
   });
