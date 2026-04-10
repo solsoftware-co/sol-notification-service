@@ -31,7 +31,7 @@ export function resolveRecipients(client: ClientRow, workflowKey: string): strin
     if (typeof entry === "string" && entry.length > 0 && entry.includes("@")) {
       valid.push(entry);
     } else {
-      logError(`resolveRecipients: invalid address skipped`, {
+      logError(`resolveRecipients: invalid address skipped`, new Error(String(entry)), {
         clientId: client.id,
         workflowKey,
         address: entry,

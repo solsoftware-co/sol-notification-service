@@ -119,6 +119,7 @@ describe("resolveRecipients — invalid address handling", () => {
     resolveRecipients(client, "form_submitted");
     expect(mockLogError).toHaveBeenCalledWith(
       expect.any(String),
+      expect.any(Error),
       expect.objectContaining({ clientId: "client-test", workflowKey: "form_submitted" })
     );
   });

@@ -118,19 +118,19 @@ export const sendAnalyticsReport = inngest.createFunction(
     });
 
     const skipped = await step.run("check-ga4-config", async () => {
-      if (!client.ga4_property_id) {
-        if (config.emailMode === "live") {
-          await writeNotificationLog({
-            client_id: clientId,
-            workflow: "send-analytics-report",
-            event_name: "analytics/report.requested",
-            outcome: "skipped",
-            recipient_email: client.email,
-            subject: buildReportTitle(data.reportPeriod.preset),
-            error_message: "Client has no GA4 property configured",
-            metadata: {},
-          });
-        }
+      // Only skip in live mode — in test/mailtrap/mock modes, analytics.ts returns
+      // mock data when GA4_SERVICE_ACCOUNT_JSON is absent, so the email can still send.
+      if (!client.ga4_property_id && config.emailMode === "live") {
+        await writeNotificationLog({
+          client_id: clientId,
+          workflow: "send-analytics-report",
+          event_name: "analytics/report.requested",
+          outcome: "skipped",
+          recipient_email: client.email,
+          subject: buildReportTitle(data.reportPeriod.preset),
+          error_message: "Client has no GA4 property configured",
+          metadata: {},
+        });
         return true;
       }
       return false;

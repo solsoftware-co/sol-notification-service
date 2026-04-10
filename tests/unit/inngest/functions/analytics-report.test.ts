@@ -523,13 +523,15 @@ describe("check-ga4-config — client has GA4 property", () => {
 });
 
 describe("check-ga4-config — client has no GA4 property, emailMode mock", () => {
-  it("returns skipped outcome and does not send email or write log", async () => {
+  it("proceeds and sends email (non-live mode falls back to mock analytics data)", async () => {
     mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
 
     const { result } = await freshEngine().execute();
 
-    expect(result).toMatchObject({ clientId: "client-1", outcome: "skipped" });
-    expect(mockSendEmail).not.toHaveBeenCalled();
+    // In mock/test/mailtrap modes, analytics.ts returns mock data when GA4 is absent,
+    // so the workflow should complete normally rather than skipping.
+    expect(result).toMatchObject({ clientId: "client-1", outcome: "logged" });
+    expect(mockSendEmail).toHaveBeenCalledOnce();
     expect(mockWriteNotificationLog).not.toHaveBeenCalled();
   });
 });
