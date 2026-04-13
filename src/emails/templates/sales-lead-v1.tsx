@@ -13,9 +13,9 @@ export type InquiryEmailProps = {
     previewText: string;
     subheader: string;
     header: string;
-    customerName: string;
-    customerEmail: string;
-    comments: string;
+    customerName?: string;
+    customerEmail?: string;
+    comments?: string;
     submittedAt: string;
     customerPhone?: string;
     interestedIn?: string;
@@ -23,6 +23,7 @@ export type InquiryEmailProps = {
     sourcePageLink?: string;
     logText?: string;
     logLink?: string;
+    customFields?: Record<string, string>;
 };
 
 export default function SalesLeadV1Email({
@@ -39,13 +40,18 @@ export default function SalesLeadV1Email({
     sourcePageLink,
     logText,
     logLink,
+    customFields,
 }: InquiryEmailProps) {
-    const fields = [
-        { label: 'Name', value: customerName },
-        { label: 'Email', value: customerEmail, href: `mailto:${customerEmail}` },
+    const standardFields = [
+        ...(customerName  ? [{ label: 'Name',  value: customerName }] : []),
+        ...(customerEmail ? [{ label: 'Email', value: customerEmail, href: `mailto:${customerEmail}` }] : []),
         ...(customerPhone ? [{ label: 'Phone', value: customerPhone, href: `tel:${customerPhone}` }] : []),
-        ...(interestedIn ? [{ label: 'Interested In', value: interestedIn }] : []),
+        ...(interestedIn  ? [{ label: 'Interested In', value: interestedIn }] : []),
     ];
+    const customEntries = customFields
+        ? Object.entries(customFields).filter(([, v]) => v !== '').map(([k, v]) => ({ label: k, value: v }))
+        : [];
+    const fields = [...standardFields, ...customEntries];
 
     const hasMetadata = !!(submittedAt || sourcePageLink || logLink);
 
@@ -60,9 +66,8 @@ export default function SalesLeadV1Email({
                 <EmailContainer>
                     <EmailHeader subheader={subheader} header={header} />
 
-                    <SectionDivider />
-
-                    <FieldGroup fields={fields} />
+                    {fields.length > 0 && <SectionDivider />}
+                    {fields.length > 0 && <FieldGroup fields={fields} />}
 
                     {comments && <SectionDivider />}
                     {comments && <MessageBlock title="Comments" message={comments} />}
@@ -142,13 +147,15 @@ export default function SalesLeadV1Email({
                         </div>
                     )}
 
-                    <CTAButton
-                        href={`mailto:${customerEmail}`}
-                        label={`Reply to ${customerName}`}
-                        variant="black"
-                        size="lg"
-                        radius="rounded"
-                    />
+                    {customerEmail && (
+                        <CTAButton
+                            href={`mailto:${customerEmail}`}
+                            label={customerName ? `Reply to ${customerName}` : 'Reply'}
+                            variant="black"
+                            size="lg"
+                            radius="rounded"
+                        />
+                    )}
 
                     <EmailFooter />
                 </EmailContainer>

@@ -6,6 +6,7 @@ const mockGenerateDailyTrendChart = vi.hoisted(() => vi.fn());
 const mockGenerateTopSourcesGauges = vi.hoisted(() => vi.fn());
 const mockGenerateTopPagesChart = vi.hoisted(() => vi.fn());
 const mockAnalyticsReportEmailFn = vi.hoisted(() => vi.fn());
+const mockSalesLeadV1EmailFn = vi.hoisted(() => vi.fn());
 const mockBuildAnalyticsExcel = vi.hoisted(() => vi.fn());
 const mockBuildExcelFilename = vi.hoisted(() => vi.fn());
 
@@ -38,6 +39,10 @@ vi.mock('../../../src/lib/charts', () => ({
 
 vi.mock('../../../src/emails/templates/analytics-report-v1', () => ({
   default: mockAnalyticsReportEmailFn,
+}));
+
+vi.mock('../../../src/emails/templates/sales-lead-v1', () => ({
+  default: mockSalesLeadV1EmailFn,
 }));
 
 vi.mock('../../../src/lib/excel', () => ({
@@ -102,6 +107,7 @@ beforeEach(() => {
   mockGenerateTopSourcesGauges.mockResolvedValue([mockChartBuffer, mockChartBuffer, mockChartBuffer]);
   mockGenerateTopPagesChart.mockResolvedValue(mockChartBuffer);
   mockAnalyticsReportEmailFn.mockReturnValue({ type: 'div', props: {} });
+  mockSalesLeadV1EmailFn.mockReturnValue({ type: 'div', props: {} });
   mockBuildAnalyticsExcel.mockResolvedValue(Buffer.from('fake-xlsx'));
   mockBuildExcelFilename.mockReturnValue('analytics-acme-corp-2026-02-16-2026-02-22.xlsx');
 });
@@ -195,7 +201,7 @@ describe('renderFormNotificationEmail', () => {
     submitterName: 'Jane Smith',
     submitterEmail: 'jane@example.com',
     submitterMessage: 'Hello, I would like a quote.',
-    formId: 'Contact Form',
+    formName: 'Contact Form',
   };
 
   it('returns a subject containing the client name', async () => {
@@ -233,12 +239,13 @@ describe('renderFormNotificationEmail', () => {
     expect(mockReadFile).toHaveBeenCalledWith(expect.stringContaining('banner_image.png'));
   });
 
-  it('includes formId in the subject when provided', async () => {
+  it('includes formName in the subject when provided', async () => {
     const result = await renderFormNotificationEmail(payload, mockClient);
     expect(result.subject).toContain('Contact Form');
+    expect(result.subject).toContain('New form submission:');
   });
 
-  it('generates a subject without formId when formId is absent', async () => {
+  it('renders generic subject when formName is absent', async () => {
     const payloadNoForm: FormSubmittedPayload = {
       clientId: 'acme',
       submitterName: 'Jane Smith',
@@ -246,8 +253,112 @@ describe('renderFormNotificationEmail', () => {
       submitterMessage: 'Hello.',
     };
     const result = await renderFormNotificationEmail(payloadNoForm, mockClient);
-    expect(result.subject).toContain('Acme Corp');
+    expect(result.subject).toBe('New inquiry — Acme Corp');
     expect(result.subject).not.toContain('undefined');
+  });
+
+  // T008: minimal-payload rendering (US1)
+  it('uses submitterEmail in previewText when name is absent', async () => {
+    const emailOnly: FormSubmittedPayload = {
+      clientId: 'acme',
+      submitterEmail: 'jane@example.com',
+    };
+    await renderFormNotificationEmail(emailOnly, mockClient);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ previewText: 'New inquiry from jane@example.com' }),
+    );
+  });
+
+  it('uses generic previewText when both name and email are absent', async () => {
+    const minimalPayload: FormSubmittedPayload = { clientId: 'acme' };
+    await renderFormNotificationEmail(minimalPayload, mockClient);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ previewText: 'New inquiry — Acme Corp' }),
+    );
+  });
+
+  // T010: submittedFrom wiring (US2)
+  it('passes submittedFrom as sourcePageLink and sourcePageText', async () => {
+    const withSource: FormSubmittedPayload = {
+      clientId: 'acme',
+      submitterEmail: 'jane@example.com',
+      submittedFrom: '/contact',
+    };
+    await renderFormNotificationEmail(withSource, mockClient);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ sourcePageLink: '/contact', sourcePageText: '/contact' }),
+    );
+  });
+
+  it('does not pass sourcePageLink when submittedFrom is absent', async () => {
+    const noSource: FormSubmittedPayload = { clientId: 'acme', submitterEmail: 'jane@example.com' };
+    await renderFormNotificationEmail(noSource, mockClient);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ sourcePageLink: undefined, sourcePageText: undefined }),
+    );
+  });
+
+  // T013: phone, formName, subject line (US3)
+  it('passes submitterPhone as customerPhone', async () => {
+    const withPhone: FormSubmittedPayload = {
+      clientId: 'acme',
+      submitterEmail: 'jane@example.com',
+      submitterPhone: '(555) 123-4567',
+    };
+    await renderFormNotificationEmail(withPhone, mockClient);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ customerPhone: '(555) 123-4567' }),
+    );
+  });
+
+  it('passes formName as interestedIn', async () => {
+    const withFormName: FormSubmittedPayload = {
+      clientId: 'acme',
+      submitterEmail: 'jane@example.com',
+      formName: 'Quote Request',
+    };
+    await renderFormNotificationEmail(withFormName, mockClient);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ interestedIn: 'Quote Request' }),
+    );
+  });
+
+  it('renders subject with formName when present', async () => {
+    const withFormName: FormSubmittedPayload = {
+      clientId: 'acme',
+      submitterEmail: 'jane@example.com',
+      formName: 'Quote Request',
+    };
+    const result = await renderFormNotificationEmail(withFormName, mockClient);
+    expect(result.subject).toBe('New form submission: Quote Request — Acme Corp');
+  });
+
+  // T017: customFields wiring (US4)
+  it('passes customFields through to SalesLeadV1Email', async () => {
+    const withCustom: FormSubmittedPayload = {
+      clientId: 'acme',
+      customFields: { 'Project Budget': '$5k' },
+    };
+    await renderFormNotificationEmail(withCustom, mockClient);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ customFields: { 'Project Budget': '$5k' } }),
+    );
+  });
+
+  it('passes undefined customFields when absent', async () => {
+    const noCustom: FormSubmittedPayload = { clientId: 'acme', submitterEmail: 'jane@example.com' };
+    await renderFormNotificationEmail(noCustom, mockClient);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ customFields: undefined }),
+    );
+  });
+
+  it('passes empty object customFields when provided as {}', async () => {
+    const emptyCustom: FormSubmittedPayload = { clientId: 'acme', customFields: {} };
+    await renderFormNotificationEmail(emptyCustom, mockClient);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ customFields: {} }),
+    );
   });
 });
 

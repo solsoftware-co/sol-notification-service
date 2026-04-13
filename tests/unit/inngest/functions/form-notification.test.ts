@@ -132,26 +132,35 @@ beforeEach(() => {
 
 // ---------------------------------------------------------------------------
 describe("validate-payload", () => {
-  it("succeeds when all required fields are present", async () => {
+  it("succeeds when clientId is present", async () => {
     const output = await t.executeStep("validate-payload");
     expect(output.step.op).toBe("StepRun");
   });
 
-  it("throws when submitterEmail is missing", async () => {
-    const tMissing = t.clone({
+  it("succeeds with only clientId (no optional fields)", async () => {
+    const tMinimal = t.clone({
       events: [
         {
-          ...validEvent,
-          data: { ...validEvent.data, submitterEmail: "" },
+          name: "form/submitted" as const,
+          data: { clientId: "client-acme" },
         },
       ],
     });
-    const output = await tMissing.executeStep("validate-payload");
-    expect(output.step.op).toBe("StepError");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((output.step.error as any)?.message).toBe(
-      "Missing required field: submitterEmail"
-    );
+    const output = await tMinimal.executeStep("validate-payload");
+    expect(output.step.op).toBe("StepRun");
+  });
+
+  it("succeeds with clientId + submitterEmail only", async () => {
+    const tEmailOnly = t.clone({
+      events: [
+        {
+          name: "form/submitted" as const,
+          data: { clientId: "client-acme", submitterEmail: "jane@example.com" },
+        },
+      ],
+    });
+    const output = await tEmailOnly.executeStep("validate-payload");
+    expect(output.step.op).toBe("StepRun");
   });
 
   it("throws when clientId is missing", async () => {

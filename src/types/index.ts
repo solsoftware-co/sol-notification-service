@@ -157,8 +157,13 @@ export interface BaseEventPayload {
 }
 
 export interface FormSubmittedPayload extends BaseEventPayload {
-  submitterName: string;
-  submitterEmail: string;
-  submitterMessage: string;
+  submitterName?: string;
+  submitterEmail?: string;
+  submitterMessage?: string;
+  submitterPhone?: string;
+  submittedFrom?: string;
+  formName?: string;
+  customFields?: Record<string, string>;
+  /** @deprecated Use formName instead. Silently ignored by the notification service. */
   formId?: string;
 }

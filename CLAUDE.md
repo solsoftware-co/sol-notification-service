@@ -21,6 +21,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - TypeScript 5.x / Node.js 20+ + `xlsx ^0.18.5` (new) + existing: `inngest ^3.x`, `resend ^3.x`, `@react-email/render`, `pino ^10.x` (013-analytics-excel-export)
 - TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x`, `resend ^3.x` — all existing; zero new packages (014-notification-preferences)
 - Neon PostgreSQL — no schema changes; uses existing `clients.settings JSONB` column (014-notification-preferences)
+- TypeScript 5.x / Node.js 20+ + Inngest ^3.x, React Email (@react-email/components, @react-email/render), Resend ^3.x — all existing; zero new packages (015-flexible-form-fields)
+- Neon PostgreSQL — no schema changes; `notification_logs.metadata` is JSONB and absorbs new fields automatically (015-flexible-form-fields)
 
 ## Project Structure
 
@@ -94,9 +96,9 @@ When adding a new Inngest email workflow, register it in the e2e test suite — 
 Run locally with: `PREVIEW_URL=<url> INNGEST_EVENT_KEY_STAGING=<key> ... npm run test:e2e`
 
 ## Recent Changes
+- 015-flexible-form-fields: Added TypeScript 5.x / Node.js 20+ + Inngest ^3.x, React Email (@react-email/components, @react-email/render), Resend ^3.x — all existing; zero new packages
 - 014-notification-preferences: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x`, `resend ^3.x` — all existing; zero new packages
 - 013-analytics-excel-export: Added TypeScript 5.x / Node.js 20+ + `xlsx ^0.18.5` (new) + existing: `inngest ^3.x`, `resend ^3.x`, `@react-email/render`, `pino ^10.x`
-- 012-notification-logging: Added TypeScript 5.x / Node.js 20+ + inngest ^3.x, @neondatabase/serverless ^1.x, pino ^10.x (all existing — no new packages)
 
 
 <!-- MANUAL ADDITIONS START -->
