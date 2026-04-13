@@ -163,20 +163,30 @@ export async function renderFormNotificationEmail(
     timeZoneName: 'short',
   });
 
-  const subject = payload.formId
-    ? `New form submission: ${payload.formId} — ${client.name}`
+  const subject = payload.formName
+    ? `New form submission: ${payload.formName} — ${client.name}`
+    : `New inquiry — ${client.name}`;
+
+  const previewText = payload.submitterName
+    ? `New inquiry from ${payload.submitterName}`
+    : payload.submitterEmail
+    ? `New inquiry from ${payload.submitterEmail}`
     : `New inquiry — ${client.name}`;
 
   const html = await render(
     SalesLeadV1Email({
-      previewText: `New inquiry from ${payload.submitterName}`,
+      previewText,
       subheader: client.name,
       header: 'New Inquiry',
       customerName: payload.submitterName,
       customerEmail: payload.submitterEmail,
       comments: payload.submitterMessage,
       submittedAt,
-      interestedIn: payload.formId,
+      customerPhone: payload.submitterPhone,
+      sourcePageLink: payload.submittedFrom,
+      sourcePageText: payload.submittedFrom,
+      interestedIn: payload.formName,
+      customFields: payload.customFields,
     }),
   );
 

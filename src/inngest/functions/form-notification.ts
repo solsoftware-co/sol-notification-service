@@ -9,9 +9,6 @@ import type { FormSubmittedPayload } from "../../types/index";
 
 const REQUIRED_FIELDS: (keyof FormSubmittedPayload)[] = [
   "clientId",
-  "submitterName",
-  "submitterEmail",
-  "submitterMessage",
 ];
 
 export const sendFormNotification = inngest.createFunction(
