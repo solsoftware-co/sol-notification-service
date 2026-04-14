@@ -226,7 +226,7 @@ export async function renderFormNotificationEmail(
     SalesLeadV1Email({
       previewText,
       subheader: client.name,
-      header: 'New Inquiry',
+      header: payload.notificationTitle ?? 'New Inquiry',
       customerName: payload.submitterName,
       customerEmail: payload.submitterEmail,
       comments: payload.submitterMessage,

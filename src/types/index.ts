@@ -222,4 +222,9 @@ export interface FormSubmittedPayload extends BaseEventPayload {
    * Omitting preserves the default "Reply to {submitter}" button.
    */
   ctaButton?: FormNotificationCtaButton;
+  /**
+   * Optional title override for the notification email header.
+   * Defaults to "New Inquiry" when omitted.
+   */
+  notificationTitle?: string;
 }

@@ -117,6 +117,25 @@ Omit `sendEmail` entirely — email sends as normal, confirming backwards compat
 
 ---
 
+## Option H: Custom Email Title
+
+```json
+{
+  "name": "form/submitted",
+  "data": {
+    "clientId": "your-test-client-id",
+    "submitterName": "Jane Smith",
+    "submitterEmail": "jane@example.com",
+    "submitterMessage": "I am interested",
+    "notificationTitle": "New Contact Request"
+  }
+}
+```
+
+**Expected behaviour**: Email header reads "New Contact Request" instead of the default "New Inquiry". Open `.email-preview/last.html` to verify.
+
+---
+
 ## Option G: sendEmail=false + Custom CTA (controls are independent)
 
 ```json
@@ -141,3 +160,4 @@ Omit `sendEmail` entirely — email sends as normal, confirming backwards compat
 | CTA button shows default text/link despite `ctaButton` in payload | `ctaButton.action.url` is invalid or missing — check Inngest step logs for a warning |
 | No CTA button rendered at all | Neither `submitterEmail` nor a valid `ctaButton` action was provided |
 | Button href shows `mailto:` despite `type: "url"` | URL validation failed (missing protocol, empty string) — silent fallback to mailto |
+| Email header still shows "New Inquiry" despite `notificationTitle` in payload | Check that `notificationTitle` is a non-empty string; empty string also falls back to default |
