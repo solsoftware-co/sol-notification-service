@@ -58,8 +58,11 @@ export const sendFormNotification = inngest.createFunction(
       return getClientById(clientId);
     });
 
+    const { recipients, source: recipientSource } = await step.run("resolve-recipients", async () => {
+      return resolveRecipients(client, "form_submitted", data.recipients);
+    });
+
     const result = await step.run("send-email", async () => {
-      const recipients = resolveRecipients(client, "form_submitted");
       const rendered = await renderFormNotificationEmail(data, client);
       return sendEmail({
         to: recipients,
@@ -108,7 +111,7 @@ export const sendFormNotification = inngest.createFunction(
           recipient_email: recipientEmail,
           subject: result.subject,
           resend_id: result.resendId,
-          metadata: { formData: data, sheets_outcome: sheetsOutcome },
+          metadata: { formData: data, sheets_outcome: sheetsOutcome, recipient_source: recipientSource },
         });
       }
     });

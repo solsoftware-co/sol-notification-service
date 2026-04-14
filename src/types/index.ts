@@ -170,6 +170,13 @@ export interface GoogleSheetsDestination {
   columns?: string[];
 }
 
+export interface RecipientResolutionResult {
+  /** Final deduplicated recipient list — always non-empty. */
+  recipients: string[];
+  /** Which tier of the fallback chain produced the list. */
+  source: "payload" | "settings" | "client_email";
+}
+
 export interface FormSubmittedPayload extends BaseEventPayload {
   submitterName?: string;
   submitterEmail?: string;
@@ -186,4 +193,11 @@ export interface FormSubmittedPayload extends BaseEventPayload {
    * sheet after sending the email.
    */
   sheetsDestination?: GoogleSheetsDestination;
+  /**
+   * Optional per-invocation recipient override.
+   * When present and valid, these addresses receive the notification
+   * instead of the stored settings or client.email.
+   * Invalid entries are discarded; empty array treated as absent.
+   */
+  recipients?: string[];
 }

@@ -164,7 +164,7 @@ export const sendAnalyticsReport = inngest.createFunction(
     });
 
     const result = await step.run("send-email", async () => {
-      const recipients = resolveRecipients(client, "analytics_report");
+      const { recipients } = resolveRecipients(client, "analytics_report");
       const rendered = await renderAnalyticsReportEmail(report, client, resolvedPeriod);
       return sendEmail({
         to: recipients,

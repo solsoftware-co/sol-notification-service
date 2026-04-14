@@ -72,6 +72,8 @@ const mockClient: ClientRow = {
   ga4_property_id: null,
   settings: {},
   created_at: new Date(),
+  google_service_account_email: null,
+  google_service_account_key: null,
 };
 
 const mockEmailResult: EmailResult = {
@@ -127,7 +129,7 @@ beforeEach(() => {
   (config as any).emailMode = "mock"; // reset to default before each test
   mockRenderFormNotification.mockResolvedValue(mockRenderResult);
   // Default: no preferences configured — resolveRecipients falls back to client.email
-  mockResolveRecipients.mockReturnValue(["owner@acme.com"]);
+  mockResolveRecipients.mockReturnValue({ recipients: ["owner@acme.com"], source: "client_email" });
 });
 
 // ---------------------------------------------------------------------------
@@ -225,7 +227,10 @@ describe("send-email", () => {
 
   it("calls renderFormNotificationEmail with payload and client, then sendEmail with rendered result", async () => {
     const tWithClient = t.clone({
-      steps: [{ id: "fetch-client-config", handler: () => mockClient }],
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
     });
 
     await tWithClient.executeStep("send-email");
@@ -246,7 +251,10 @@ describe("send-email", () => {
 
   it("returns the EmailResult from sendEmail", async () => {
     const tWithClient = t.clone({
-      steps: [{ id: "fetch-client-config", handler: () => mockClient }],
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
     });
 
     const output = await tWithClient.executeStep("send-email");
@@ -257,40 +265,39 @@ describe("send-email", () => {
 });
 
 // ---------------------------------------------------------------------------
-describe("send-email — notification preferences", () => {
-  beforeEach(() => {
-    vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
+describe("resolve-recipients — notification preferences", () => {
+  it("calls resolveRecipients with client, workflowKey, and payload recipients", async () => {
+    const tWithClient = t.clone({
+      steps: [{ id: "fetch-client-config", handler: () => mockClient }],
+    });
+
+    await tWithClient.executeStep("resolve-recipients");
+
+    // data.recipients is undefined in validEvent — passed as third arg
+    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "form_submitted", undefined);
   });
 
-  it("uses the configured form_submitted recipient list when preferences are set", async () => {
+  it("uses configured form_submitted recipient list when resolveRecipients returns settings tier", async () => {
     const preferenceList = ["sales@acme.com", "manager@acme.com"];
-    mockResolveRecipients.mockReturnValue(preferenceList);
+    mockResolveRecipients.mockReturnValue({ recipients: preferenceList, source: "settings" });
 
     const tWithClient = t.clone({
       steps: [{ id: "fetch-client-config", handler: () => mockClient }],
     });
 
-    await tWithClient.executeStep("send-email");
-
-    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "form_submitted");
-    expect(sendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ to: ["sales@acme.com", "manager@acme.com"] })
-    );
+    const output = await tWithClient.executeStep("resolve-recipients");
+    expect(output.step.data).toEqual({ recipients: preferenceList, source: "settings" });
   });
 
-  it("falls back to [client.email] when no preference is configured", async () => {
-    mockResolveRecipients.mockReturnValue(["owner@acme.com"]);
+  it("falls back to [client.email] when resolveRecipients returns client_email tier", async () => {
+    mockResolveRecipients.mockReturnValue({ recipients: ["owner@acme.com"], source: "client_email" });
 
     const tWithClient = t.clone({
       steps: [{ id: "fetch-client-config", handler: () => mockClient }],
     });
 
-    await tWithClient.executeStep("send-email");
-
-    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "form_submitted");
-    expect(sendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ to: ["owner@acme.com"] })
-    );
+    const output = await tWithClient.executeStep("resolve-recipients");
+    expect(output.step.data).toEqual({ recipients: ["owner@acme.com"], source: "client_email" });
   });
 });
 
