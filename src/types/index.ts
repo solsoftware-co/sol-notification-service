@@ -8,7 +8,6 @@ export interface AppConfig {
   resendApiKey: string | null;
   resendFrom: string;
   databaseUrl: string;
-  ga4CredentialsJson: string | null;
   logtailToken: string | null;
   mailtrapSmtpUser: string | null;
   mailtrapSmtpPass: string | null;
@@ -93,6 +92,8 @@ export interface ClientRow {
   active: boolean;
   settings: Record<string, unknown>;
   created_at: Date | string; // Date from DB; Inngest step serialization yields string
+  google_service_account_email: string | null;
+  google_service_account_key: string | null;
 }
 
 export interface NotificationLogRow {
@@ -156,6 +157,36 @@ export interface BaseEventPayload {
   clientId: string;
 }
 
+export interface GoogleSheetsDestination {
+  /** ID of the target Google Spreadsheet (from the sheet URL). */
+  spreadsheetId: string;
+  /** Tab/sheet name within the spreadsheet. Defaults to the first sheet if omitted. */
+  sheetName?: string;
+  /**
+   * Ordered list of field identifiers mapping submission fields to columns.
+   * Use "_timestamp" for the submission timestamp.
+   * If omitted: writes [timestamp, ...all form fields in received order].
+   */
+  columns?: string[];
+}
+
+export interface RecipientResolutionResult {
+  /** Final deduplicated recipient list — always non-empty. */
+  recipients: string[];
+  /** Which tier of the fallback chain produced the list. */
+  source: "payload" | "settings" | "client_email";
+}
+
+/** Configures the call-to-action button in a form notification email. */
+export type FormNotificationCtaButton = {
+  /** Optional label override for the CTA button. Empty string falls back to default. */
+  text?: string;
+  /** Optional action. Absent = default mailto to submitter's email. */
+  action?:
+    | { type: "url"; url: string }
+    | { type: "mailto"; email?: string };
+};
+
 export interface FormSubmittedPayload extends BaseEventPayload {
   submitterName?: string;
   submitterEmail?: string;
@@ -166,4 +197,34 @@ export interface FormSubmittedPayload extends BaseEventPayload {
   customFields?: Record<string, string>;
   /** @deprecated Use formName instead. Silently ignored by the notification service. */
   formId?: string;
+  /**
+   * Optional Google Sheets destination. When present (and the client has
+   * credentials registered), the workflow appends a row to the specified
+   * sheet after sending the email.
+   */
+  sheetsDestination?: GoogleSheetsDestination;
+  /**
+   * Optional per-invocation recipient override.
+   * When present and valid, these addresses receive the notification
+   * instead of the stored settings or client.email.
+   * Invalid entries are discarded; empty array treated as absent.
+   */
+  recipients?: string[];
+  /**
+   * When false, the email send step is skipped for this submission.
+   * Other steps (e.g. Google Sheets sync) still execute normally.
+   * Defaults to true when omitted.
+   */
+  sendEmail?: boolean;
+  /**
+   * Optional CTA button override for the notification email.
+   * Supports mailto (default) and url action types.
+   * Omitting preserves the default "Reply to {submitter}" button.
+   */
+  ctaButton?: FormNotificationCtaButton;
+  /**
+   * Optional title override for the notification email header.
+   * Defaults to "New Inquiry" when omitted.
+   */
+  notificationTitle?: string;
 }

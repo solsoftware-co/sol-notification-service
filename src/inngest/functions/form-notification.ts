@@ -2,14 +2,37 @@ import { inngest } from "../client";
 import { config } from "../../lib/config";
 import { getClientById, writeNotificationLog } from "../../lib/db";
 import { sendEmail } from "../../lib/email";
+import { appendSheetRow } from "../../lib/sheets";
 import { resolveRecipients } from "../../lib/notifications";
 import { renderFormNotificationEmail } from "../../lib/templates";
 import { log } from "../../utils/logger";
-import type { FormSubmittedPayload } from "../../types/index";
+import type { FormSubmittedPayload, EmailResult } from "../../types/index";
 
 const REQUIRED_FIELDS: (keyof FormSubmittedPayload)[] = [
   "clientId",
 ];
+
+function buildFieldMap(data: FormSubmittedPayload): Record<string, string> {
+  const fields: Record<string, string> = {};
+  const scalar: (keyof FormSubmittedPayload)[] = [
+    "submitterName",
+    "submitterEmail",
+    "submitterMessage",
+    "submitterPhone",
+    "submittedFrom",
+    "formName",
+  ];
+  for (const key of scalar) {
+    const val = data[key];
+    if (typeof val === "string" && val) {
+      fields[key] = val;
+    }
+  }
+  if (data.customFields) {
+    Object.assign(fields, data.customFields);
+  }
+  return fields;
+}
 
 export const sendFormNotification = inngest.createFunction(
   {
@@ -35,8 +58,14 @@ export const sendFormNotification = inngest.createFunction(
       return getClientById(clientId);
     });
 
+    const { recipients, source: recipientSource } = await step.run("resolve-recipients", async () => {
+      return resolveRecipients(client, "form_submitted", data.recipients);
+    });
+
     const result = await step.run("send-email", async () => {
-      const recipients = resolveRecipients(client, "form_submitted");
+      if (data.sendEmail === false) {
+        return { skipped: true, reason: "sendEmail=false" } as const;
+      }
       const rendered = await renderFormNotificationEmail(data, client);
       return sendEmail({
         to: recipients,
@@ -46,30 +75,56 @@ export const sendFormNotification = inngest.createFunction(
       });
     });
 
+    const sheetsOutcome = await step.run("sync-to-google-sheets", async () => {
+      if (!data.sheetsDestination) {
+        return { skipped: true, reason: "no destination in payload" };
+      }
+      if (!client.google_service_account_key) {
+        return { skipped: true, reason: "no credentials on client" };
+      }
+      if (config.emailMode !== "live") {
+        return { skipped: true, reason: "non-live mode" };
+      }
+      const fields = buildFieldMap(data);
+      const timestamp = new Date().toISOString();
+      return appendSheetRow(
+        client.google_service_account_key,
+        data.sheetsDestination,
+        fields,
+        timestamp
+      );
+    });
+
     await step.run("log-result", async () => {
+      if ("skipped" in result && result.skipped) {
+        log("Workflow completed — email skipped", { clientId, reason: result.reason });
+        return;
+      }
+      const emailResult = result as EmailResult;
       log("Workflow completed", {
         clientId,
-        mode: result.mode,
-        outcome: result.outcome,
-        originalTo: result.originalTo,
+        mode: emailResult.mode,
+        outcome: emailResult.outcome,
+        originalTo: emailResult.originalTo,
       });
       if (config.emailMode === "live") {
-        const recipientEmail = Array.isArray(result.originalTo)
-          ? result.originalTo.join(", ")
-          : result.originalTo;
+        const recipientEmail = Array.isArray(emailResult.originalTo)
+          ? emailResult.originalTo.join(", ")
+          : emailResult.originalTo;
         await writeNotificationLog({
           client_id: clientId,
           workflow: "send-form-notification",
           event_name: "form/submitted",
-          outcome: result.outcome === "sent" ? "sent" : "failed",
+          outcome: emailResult.outcome === "sent" ? "sent" : "failed",
           recipient_email: recipientEmail,
-          subject: result.subject,
-          resend_id: result.resendId,
-          metadata: { formData: data },
+          subject: emailResult.subject,
+          resend_id: emailResult.resendId,
+          metadata: { formData: data, sheets_outcome: sheetsOutcome, recipient_source: recipientSource },
         });
       }
     });
 
-    return { clientId, outcome: result.outcome };
+    const skipped = "skipped" in result && result.skipped;
+    return { clientId, outcome: skipped ? "skipped" : (result as EmailResult).outcome };
   }
 );

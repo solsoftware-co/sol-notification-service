@@ -1,5 +1,4 @@
 import { BetaAnalyticsDataClient, protos } from "@google-analytics/data";
-import { config } from "./config";
 import { log } from "../utils/logger";
 import type {
   AnalyticsReport,
@@ -43,14 +42,14 @@ interface RunReportArgs {
   limit?: number;
 }
 
-function createClient(): BetaAnalyticsDataClient {
+function createClient(credentialsJson: string): BetaAnalyticsDataClient {
   return new BetaAnalyticsDataClient({
-    credentials: JSON.parse(config.ga4CredentialsJson!),
+    credentials: JSON.parse(credentialsJson),
   });
 }
 
-async function runReport(args: RunReportArgs): Promise<IRunReportResponse> {
-  const client = createClient();
+async function runReport(args: RunReportArgs & { credentialsJson: string }): Promise<IRunReportResponse> {
+  const client = createClient(args.credentialsJson);
   const [response] = await client.runReport({
     property: `properties/${args.propertyId}`,
     dateRanges: [{ startDate: args.startDate, endDate: args.endDate }],
@@ -63,11 +62,13 @@ async function runReport(args: RunReportArgs): Promise<IRunReportResponse> {
 }
 
 async function getReportData(
+  credentialsJson: string,
   propertyId: string,
   startDate: string,
   endDate: string
 ): Promise<IRunReportResponse> {
   return runReport({
+    credentialsJson,
     propertyId,
     startDate,
     endDate,
@@ -82,11 +83,13 @@ async function getReportData(
 }
 
 async function getAverageSessionDuration(
+  credentialsJson: string,
   propertyId: string,
   startDate: string,
   endDate: string
 ): Promise<IRunReportResponse> {
   return runReport({
+    credentialsJson,
     propertyId,
     startDate,
     endDate,
@@ -95,12 +98,14 @@ async function getAverageSessionDuration(
 }
 
 async function getTrafficSourceData(
+  credentialsJson: string,
   propertyId: string,
   startDate: string,
   endDate: string,
   limit = 5
 ): Promise<IRunReportResponse> {
   return runReport({
+    credentialsJson,
     propertyId,
     startDate,
     endDate,
@@ -112,12 +117,14 @@ async function getTrafficSourceData(
 }
 
 async function getMostViewedPagesData(
+  credentialsJson: string,
   propertyId: string,
   startDate: string,
   endDate: string,
   limit = 5
 ): Promise<IRunReportResponse> {
   return runReport({
+    credentialsJson,
     propertyId,
     startDate,
     endDate,
@@ -169,18 +176,20 @@ function computePriorPeriods(period: ResolvedPeriod, count: number): Array<{ sta
 }
 
 async function getPeriodTotals(
+  credentialsJson: string,
   propertyId: string,
   start: string,
   end: string,
 ): Promise<{ sessions: number; activeUsers: number; newUsers: number; avgSessionDurationSecs: number }> {
   const [totalsRes, durationRes] = await Promise.all([
     runReport({
+      credentialsJson,
       propertyId,
       startDate: start,
       endDate: end,
       metrics: [{ name: 'sessions' }, { name: 'activeUsers' }, { name: 'newUsers' }],
     }),
-    getAverageSessionDuration(propertyId, start, end),
+    getAverageSessionDuration(credentialsJson, propertyId, start, end),
   ]);
   return {
     sessions: Math.round(metricVal(totalsRes, 0, 0)),
@@ -222,9 +231,10 @@ function mockReport(period: ResolvedPeriod): AnalyticsReport {
 export async function getAnalyticsReport(
   propertyId: string,
   period: ResolvedPeriod,
+  credentialsJson: string | null,
   options: AnalyticsReportOptions = {}
 ): Promise<AnalyticsReport> {
-  if (!config.ga4CredentialsJson || !propertyId) {
+  if (!credentialsJson || !propertyId) {
     log("[analytics] GA4 not fully configured (missing credentials or property ID) — returning mock data");
     return mockReport(period);
   }
@@ -235,10 +245,10 @@ export async function getAnalyticsReport(
   const { start, end } = period;
 
   const [dailyData, durationData, sourcesData, pagesData] = await Promise.all([
-    getReportData(propertyId, start, end),
-    getAverageSessionDuration(propertyId, start, end),
-    getTrafficSourceData(propertyId, start, end, sourcesLimit),
-    getMostViewedPagesData(propertyId, start, end, pagesLimit),
+    getReportData(credentialsJson, propertyId, start, end),
+    getAverageSessionDuration(credentialsJson, propertyId, start, end),
+    getTrafficSourceData(credentialsJson, propertyId, start, end, sourcesLimit),
+    getMostViewedPagesData(credentialsJson, propertyId, start, end, pagesLimit),
   ]);
 
   // Aggregate sessions/users/newUsers from daily rows
@@ -280,7 +290,7 @@ export async function getAnalyticsReport(
 
   const priorPeriodDefs = computePriorPeriods(period, 3);
   const priorResults = await Promise.all(
-    priorPeriodDefs.map(p => getPeriodTotals(propertyId, p.start, p.end).catch(() => null))
+    priorPeriodDefs.map(p => getPeriodTotals(credentialsJson, propertyId, p.start, p.end).catch(() => null))
   );
   const historicalPeriods: HistoricalPeriodSnapshot[] = priorPeriodDefs
     .map((def, i) => priorResults[i] ? { periodLabel: def.label, periodStart: def.start, ...priorResults[i]! } : null)

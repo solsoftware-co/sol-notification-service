@@ -9,10 +9,11 @@ import {
   generateTopPagesChart,
 } from './charts';
 import { buildAnalyticsExcel, buildExcelFilename } from './excel';
-import { log } from '../utils/logger';
+import { log, logError } from '../utils/logger';
 import type { ReportPeriodPreset } from '../types/index';
 import type {
   FormSubmittedPayload,
+  FormNotificationCtaButton,
   ClientRow,
   EmailRenderResult,
   EmailAttachment,
@@ -148,6 +149,52 @@ function formatDuration(secs: number): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+/** Resolves the CTA button href and label for a form notification email.
+ *  Pure function — no side effects except logError() warnings on invalid input. */
+export function resolveCta(
+  ctaButton: FormNotificationCtaButton | undefined,
+  submitterEmail: string | undefined,
+  submitterName: string | undefined,
+): { ctaHref?: string; ctaLabel?: string } {
+  const defaultLabel = submitterName ? `Reply to ${submitterName}` : 'Reply';
+  const defaultHref = submitterEmail ? `mailto:${submitterEmail}` : undefined;
+
+  if (!ctaButton) {
+    return { ctaHref: defaultHref, ctaLabel: defaultHref ? defaultLabel : undefined };
+  }
+
+  let actionHref: string | undefined;
+  let usedFallback = false;
+
+  if (!ctaButton.action) {
+    actionHref = defaultHref;
+  } else if (ctaButton.action.type === 'url') {
+    const url = ctaButton.action.url;
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      actionHref = url;
+    } else {
+      logError('resolveCta: invalid URL in ctaButton.action.url — falling back to default mailto', { url });
+      actionHref = defaultHref;
+      usedFallback = true;
+    }
+  } else if (ctaButton.action.type === 'mailto') {
+    const email = ctaButton.action.email ?? submitterEmail;
+    actionHref = email ? `mailto:${email}` : undefined;
+  } else {
+    logError('resolveCta: unrecognised ctaButton.action.type — falling back to default mailto', { action: ctaButton.action });
+    actionHref = defaultHref;
+    usedFallback = true;
+  }
+
+  const rawText = ctaButton.text?.trim();
+  const ctaLabel = (!usedFallback && rawText) ? rawText : defaultLabel;
+
+  return {
+    ctaHref: actionHref,
+    ctaLabel: actionHref ? ctaLabel : undefined,
+  };
+}
+
 export async function renderFormNotificationEmail(
   payload: FormSubmittedPayload,
   client: ClientRow,
@@ -173,11 +220,13 @@ export async function renderFormNotificationEmail(
     ? `New inquiry from ${payload.submitterEmail}`
     : `New inquiry — ${client.name}`;
 
+  const { ctaHref, ctaLabel } = resolveCta(payload.ctaButton, payload.submitterEmail, payload.submitterName);
+
   const html = await render(
     SalesLeadV1Email({
       previewText,
       subheader: client.name,
-      header: 'New Inquiry',
+      header: payload.notificationTitle ?? 'New Inquiry',
       customerName: payload.submitterName,
       customerEmail: payload.submitterEmail,
       comments: payload.submitterMessage,
@@ -187,6 +236,8 @@ export async function renderFormNotificationEmail(
       sourcePageText: payload.submittedFrom,
       interestedIn: payload.formName,
       customFields: payload.customFields,
+      ctaHref,
+      ctaLabel,
     }),
   );
 

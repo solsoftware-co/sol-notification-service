@@ -72,6 +72,8 @@ const mockClient: ClientRow = {
   ga4_property_id: null,
   settings: {},
   created_at: new Date(),
+  google_service_account_email: null,
+  google_service_account_key: null,
 };
 
 const mockEmailResult: EmailResult = {
@@ -127,7 +129,7 @@ beforeEach(() => {
   (config as any).emailMode = "mock"; // reset to default before each test
   mockRenderFormNotification.mockResolvedValue(mockRenderResult);
   // Default: no preferences configured — resolveRecipients falls back to client.email
-  mockResolveRecipients.mockReturnValue(["owner@acme.com"]);
+  mockResolveRecipients.mockReturnValue({ recipients: ["owner@acme.com"], source: "client_email" });
 });
 
 // ---------------------------------------------------------------------------
@@ -225,7 +227,10 @@ describe("send-email", () => {
 
   it("calls renderFormNotificationEmail with payload and client, then sendEmail with rendered result", async () => {
     const tWithClient = t.clone({
-      steps: [{ id: "fetch-client-config", handler: () => mockClient }],
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
     });
 
     await tWithClient.executeStep("send-email");
@@ -246,7 +251,10 @@ describe("send-email", () => {
 
   it("returns the EmailResult from sendEmail", async () => {
     const tWithClient = t.clone({
-      steps: [{ id: "fetch-client-config", handler: () => mockClient }],
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
     });
 
     const output = await tWithClient.executeStep("send-email");
@@ -257,40 +265,39 @@ describe("send-email", () => {
 });
 
 // ---------------------------------------------------------------------------
-describe("send-email — notification preferences", () => {
-  beforeEach(() => {
-    vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
+describe("resolve-recipients — notification preferences", () => {
+  it("calls resolveRecipients with client, workflowKey, and payload recipients", async () => {
+    const tWithClient = t.clone({
+      steps: [{ id: "fetch-client-config", handler: () => mockClient }],
+    });
+
+    await tWithClient.executeStep("resolve-recipients");
+
+    // data.recipients is undefined in validEvent — passed as third arg
+    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "form_submitted", undefined);
   });
 
-  it("uses the configured form_submitted recipient list when preferences are set", async () => {
+  it("uses configured form_submitted recipient list when resolveRecipients returns settings tier", async () => {
     const preferenceList = ["sales@acme.com", "manager@acme.com"];
-    mockResolveRecipients.mockReturnValue(preferenceList);
+    mockResolveRecipients.mockReturnValue({ recipients: preferenceList, source: "settings" });
 
     const tWithClient = t.clone({
       steps: [{ id: "fetch-client-config", handler: () => mockClient }],
     });
 
-    await tWithClient.executeStep("send-email");
-
-    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "form_submitted");
-    expect(sendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ to: ["sales@acme.com", "manager@acme.com"] })
-    );
+    const output = await tWithClient.executeStep("resolve-recipients");
+    expect(output.step.data).toEqual({ recipients: preferenceList, source: "settings" });
   });
 
-  it("falls back to [client.email] when no preference is configured", async () => {
-    mockResolveRecipients.mockReturnValue(["owner@acme.com"]);
+  it("falls back to [client.email] when resolveRecipients returns client_email tier", async () => {
+    mockResolveRecipients.mockReturnValue({ recipients: ["owner@acme.com"], source: "client_email" });
 
     const tWithClient = t.clone({
       steps: [{ id: "fetch-client-config", handler: () => mockClient }],
     });
 
-    await tWithClient.executeStep("send-email");
-
-    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "form_submitted");
-    expect(sendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ to: ["owner@acme.com"] })
-    );
+    const output = await tWithClient.executeStep("resolve-recipients");
+    expect(output.step.data).toEqual({ recipients: ["owner@acme.com"], source: "client_email" });
   });
 });
 
@@ -361,5 +368,137 @@ describe("log-result — emailMode test", () => {
     await t.execute();
 
     expect(mockWriteNotificationLog).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T009/T010: sendEmail payload control
+// ---------------------------------------------------------------------------
+
+describe("send-email — sendEmail: false skip", () => {
+  it("returns { skipped: true } and does not call sendEmail when sendEmail: false", async () => {
+    const eventWithSkip = {
+      name: "form/submitted" as const,
+      data: { ...validEvent.data, sendEmail: false },
+    };
+    const tSkip = new InngestTestEngine({
+      function: sendFormNotification,
+      events: [eventWithSkip],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const tWithClient = tSkip.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
+    });
+
+    const output = await tWithClient.executeStep("send-email");
+
+    expect(output.step.op).toBe("StepRun");
+    expect(output.step.data).toEqual({ skipped: true, reason: "sendEmail=false" });
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(mockRenderFormNotification).not.toHaveBeenCalled();
+  });
+
+  it("calls sendEmail when sendEmail: true (explicit)", async () => {
+    vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
+    const eventExplicitTrue = {
+      name: "form/submitted" as const,
+      data: { ...validEvent.data, sendEmail: true },
+    };
+    const tTrue = new InngestTestEngine({
+      function: sendFormNotification,
+      events: [eventExplicitTrue],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const tWithClient = tTrue.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
+    });
+
+    const output = await tWithClient.executeStep("send-email");
+
+    expect(output.step.op).toBe("StepRun");
+    expect(sendEmail).toHaveBeenCalledOnce();
+  });
+
+  it("calls sendEmail when sendEmail is absent (default true)", async () => {
+    vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
+    const tWithClient = t.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
+    });
+
+    await tWithClient.executeStep("send-email");
+
+    expect(sendEmail).toHaveBeenCalledOnce();
+  });
+
+  it("sync-to-google-sheets step still runs when sendEmail: false (controls are independent)", async () => {
+    const sheetsEvent = {
+      name: "form/submitted" as const,
+      data: {
+        ...validEvent.data,
+        sendEmail: false,
+        sheetsDestination: { spreadsheetId: "fake-id" },
+      },
+    };
+    const tSheets = new InngestTestEngine({
+      function: sendFormNotification,
+      events: [sheetsEvent],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const tWithClient = tSheets.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+        { id: "send-email", handler: () => ({ skipped: true, reason: "sendEmail=false" }) },
+      ],
+    });
+
+    // sync-to-google-sheets should still execute (skipped for no credentials, but step runs)
+    const output = await tWithClient.executeStep("sync-to-google-sheets");
+    expect(output.step.op).toBe("StepRun");
+    expect(output.step.data).toEqual(expect.objectContaining({ skipped: true }));
+  });
+});
+
+// T010: sendEmail: false + ctaButton are independent
+describe("send-email — sendEmail: false + ctaButton (controls are independent)", () => {
+  it("no email sent when sendEmail: false even if ctaButton is provided", async () => {
+    const combinedEvent = {
+      name: "form/submitted" as const,
+      data: {
+        ...validEvent.data,
+        sendEmail: false,
+        ctaButton: { text: "Ignored", action: { type: "url" as const, url: "https://example.com" } },
+      },
+    };
+    const tCombined = new InngestTestEngine({
+      function: sendFormNotification,
+      events: [combinedEvent],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const tWithClient = tCombined.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
+    });
+
+    const output = await tWithClient.executeStep("send-email");
+
+    expect(output.step.data).toEqual({ skipped: true, reason: "sendEmail=false" });
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(mockRenderFormNotification).not.toHaveBeenCalled();
   });
 });

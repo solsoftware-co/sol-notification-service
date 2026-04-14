@@ -33,7 +33,7 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
 
 export async function getClientById(id: string): Promise<ClientRow> {
   const result = await query<ClientRow>(
-    "SELECT id, name, email, ga4_property_id, active, settings, created_at FROM clients WHERE id = $1",
+    "SELECT id, name, email, ga4_property_id, active, settings, created_at, google_service_account_email, google_service_account_key FROM clients WHERE id = $1",
     [id]
   );
 
@@ -62,7 +62,7 @@ export async function getAllActiveClients(options?: {
     conditions.push(`email LIKE $${values.length}`);
   }
 
-  let sql = `SELECT id, name, email, ga4_property_id, active, settings, created_at FROM clients WHERE ${conditions.join(" AND ")}`;
+  let sql = `SELECT id, name, email, ga4_property_id, active, settings, created_at, google_service_account_email, google_service_account_key FROM clients WHERE ${conditions.join(" AND ")}`;
 
   if (options?.limit !== undefined) {
     values.push(options.limit);

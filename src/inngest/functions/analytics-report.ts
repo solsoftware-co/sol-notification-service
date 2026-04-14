@@ -152,14 +152,19 @@ export const sendAnalyticsReport = inngest.createFunction(
     } as any);
 
     const report = await step.run("fetch-analytics-data", async () => {
-      return getAnalyticsReport(client.ga4_property_id!, resolvedPeriod, {
-        topSourcesLimit: data.topSourcesLimit,
-        topPagesLimit: data.topPagesLimit,
-      });
+      return getAnalyticsReport(
+        client.ga4_property_id!,
+        resolvedPeriod,
+        client.google_service_account_key,
+        {
+          topSourcesLimit: data.topSourcesLimit,
+          topPagesLimit: data.topPagesLimit,
+        }
+      );
     });
 
     const result = await step.run("send-email", async () => {
-      const recipients = resolveRecipients(client, "analytics_report");
+      const { recipients } = resolveRecipients(client, "analytics_report");
       const rendered = await renderAnalyticsReportEmail(report, client, resolvedPeriod);
       return sendEmail({
         to: recipients,

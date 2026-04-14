@@ -77,6 +77,8 @@ const mockClient: ClientRow = {
   active: true,
   settings: {},
   created_at: new Date(),
+  google_service_account_email: null,
+  google_service_account_key: null,
 };
 
 const mockResolvedPeriod: ResolvedPeriod = {
@@ -155,7 +157,7 @@ beforeEach(() => {
     attachments: [],
   });
   // Default: no preferences configured — resolveRecipients falls back to client.email
-  mockResolveRecipients.mockReturnValue(["client@example.com"]);
+  mockResolveRecipients.mockReturnValue({ recipients: ["client@example.com"], source: "client_email" });
 });
 
 // ---------------------------------------------------------------------------
@@ -470,7 +472,7 @@ describe("full execute — happy path, last_week", () => {
 describe("send-email — notification preferences", () => {
   it("uses the configured analytics_report recipient list when preferences are set", async () => {
     const preferenceList = ["marketing@example.com", "cmo@example.com"];
-    mockResolveRecipients.mockReturnValue(preferenceList);
+    mockResolveRecipients.mockReturnValue({ recipients: preferenceList, source: "settings" });
 
     const tWithClient = t.clone({
       steps: [
@@ -489,7 +491,7 @@ describe("send-email — notification preferences", () => {
   });
 
   it("falls back to [client.email] when no analytics_report preference is configured", async () => {
-    mockResolveRecipients.mockReturnValue(["client@example.com"]);
+    mockResolveRecipients.mockReturnValue({ recipients: ["client@example.com"], source: "client_email" });
 
     const tWithClient = t.clone({
       steps: [

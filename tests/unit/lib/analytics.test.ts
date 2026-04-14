@@ -1,4 +1,4 @@
-// T012 + T017: analytics module unit tests
+// analytics.test.ts — Unit tests for getAnalyticsReport()
 // Mocks @google-analytics/data so no real GA4 calls are made.
 
 const mockRunReport = vi.hoisted(() => vi.fn());
@@ -26,7 +26,6 @@ vi.mock("../../../src/lib/config", () => ({
     resendApiKey: null,
     resendFrom: "no-reply@test.local",
     databaseUrl: "postgresql://mock",
-    ga4CredentialsJson: null,
   },
 }));
 
@@ -38,8 +37,9 @@ vi.mock("../../../src/utils/logger", () => ({
 
 import { getAnalyticsReport } from "../../../src/lib/analytics";
 import type { ResolvedPeriod } from "../../../src/types/index";
-import { config } from "../../../src/lib/config";
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
+
+const MOCK_CREDENTIALS = '{"type":"service_account","client_email":"sa@test.iam.gserviceaccount.com","private_key":"key"}';
 
 const mockPeriod: ResolvedPeriod = {
   start: "2026-02-16",
@@ -66,9 +66,8 @@ describe("getAnalyticsReport", () => {
   });
 
   // -------------------------------------------------------------------------
-  it("mock mode — returns AnalyticsReport with isMock:true, SDK never instantiated", async () => {
-    // config.ga4CredentialsJson is null (default mock)
-    const report = await getAnalyticsReport("123456789", mockPeriod);
+  it("returns mock data with isMock:true when credentialsJson is null", async () => {
+    const report = await getAnalyticsReport("123456789", mockPeriod, null);
 
     expect(report.isMock).toBe(true);
     expect(report.sessions).toBeGreaterThan(0);
@@ -78,9 +77,15 @@ describe("getAnalyticsReport", () => {
   });
 
   // -------------------------------------------------------------------------
-  it("live mode — calls all 4 runReport variants and returns parsed AnalyticsReport", async () => {
-    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
+  it("returns mock data when propertyId is falsy (even with credentials)", async () => {
+    const report = await getAnalyticsReport("", mockPeriod, MOCK_CREDENTIALS);
 
+    expect(report.isMock).toBe(true);
+    expect(BetaAnalyticsDataClient).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  it("live mode — calls all 4 runReport variants and returns parsed AnalyticsReport", async () => {
     // Daily report: 2 rows, metrics: sessions / activeUsers / newUsers
     const dailyResponse = {
       rows: [
@@ -124,7 +129,7 @@ describe("getAnalyticsReport", () => {
       .mockResolvedValueOnce([priorTotalsResponse])    // call 9
       .mockResolvedValueOnce([priorDurationResponse]); // call 10
 
-    const report = await getAnalyticsReport("123456789", mockPeriod);
+    const report = await getAnalyticsReport("123456789", mockPeriod, MOCK_CREDENTIALS);
 
     expect(report.isMock).toBe(false);
     expect(report.sessions).toBe(25);       // 10 + 15
@@ -145,8 +150,6 @@ describe("getAnalyticsReport", () => {
 
   // -------------------------------------------------------------------------
   it("zero-traffic — empty rows returns zeros and empty lists", async () => {
-    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
-
     const emptyResponse = { rows: [] };
 
     mockRunReport
@@ -155,7 +158,7 @@ describe("getAnalyticsReport", () => {
       .mockResolvedValueOnce([emptyResponse])
       .mockResolvedValueOnce([emptyResponse]);
 
-    const report = await getAnalyticsReport("123456789", mockPeriod);
+    const report = await getAnalyticsReport("123456789", mockPeriod, MOCK_CREDENTIALS);
 
     expect(report.sessions).toBe(0);
     expect(report.activeUsers).toBe(0);
@@ -170,11 +173,10 @@ describe("getAnalyticsReport", () => {
   // -------------------------------------------------------------------------
   // Per-preset default limits
   it("last_week preset — uses 5 sources and 5 pages by default", async () => {
-    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
     const emptyResponse = { rows: [] };
     mockRunReport.mockResolvedValue([emptyResponse]);
 
-    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_week" });
+    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_week" }, MOCK_CREDENTIALS);
 
     const sourcesCall = mockRunReport.mock.calls[2][0];
     const pagesCall   = mockRunReport.mock.calls[3][0];
@@ -183,11 +185,10 @@ describe("getAnalyticsReport", () => {
   });
 
   it("last_month preset — uses 10 sources and 20 pages by default", async () => {
-    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
     const emptyResponse = { rows: [] };
     mockRunReport.mockResolvedValue([emptyResponse]);
 
-    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_month" });
+    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_month" }, MOCK_CREDENTIALS);
 
     const sourcesCall = mockRunReport.mock.calls[2][0];
     const pagesCall   = mockRunReport.mock.calls[3][0];
@@ -196,11 +197,10 @@ describe("getAnalyticsReport", () => {
   });
 
   it("last_30_days preset — uses 10 sources and 20 pages by default", async () => {
-    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
     const emptyResponse = { rows: [] };
     mockRunReport.mockResolvedValue([emptyResponse]);
 
-    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_30_days" });
+    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_30_days" }, MOCK_CREDENTIALS);
 
     const sourcesCall = mockRunReport.mock.calls[2][0];
     const pagesCall   = mockRunReport.mock.calls[3][0];
@@ -211,11 +211,10 @@ describe("getAnalyticsReport", () => {
   // -------------------------------------------------------------------------
   // Custom limit overrides
   it("custom topSourcesLimit overrides the preset default", async () => {
-    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
     const emptyResponse = { rows: [] };
     mockRunReport.mockResolvedValue([emptyResponse]);
 
-    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_week" }, { topSourcesLimit: 15 });
+    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_week" }, MOCK_CREDENTIALS, { topSourcesLimit: 15 });
 
     const sourcesCall = mockRunReport.mock.calls[2][0];
     const pagesCall   = mockRunReport.mock.calls[3][0];
@@ -224,11 +223,10 @@ describe("getAnalyticsReport", () => {
   });
 
   it("custom topPagesLimit overrides the preset default", async () => {
-    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
     const emptyResponse = { rows: [] };
     mockRunReport.mockResolvedValue([emptyResponse]);
 
-    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_month" }, { topPagesLimit: 3 });
+    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_month" }, MOCK_CREDENTIALS, { topPagesLimit: 3 });
 
     const sourcesCall = mockRunReport.mock.calls[2][0];
     const pagesCall   = mockRunReport.mock.calls[3][0];
@@ -238,41 +236,39 @@ describe("getAnalyticsReport", () => {
 
   // -------------------------------------------------------------------------
   // historicalPeriods
-  describe('historicalPeriods', () => {
-    it('mock mode — returns 3 pre-defined historical period entries', async () => {
-      vi.mocked(config).ga4CredentialsJson = null; // reset in case a prior test mutated it
-      const report = await getAnalyticsReport("123456789", mockPeriod);
+  describe("historicalPeriods", () => {
+    it("mock mode — returns 3 pre-defined historical period entries", async () => {
+      const report = await getAnalyticsReport("123456789", mockPeriod, null);
 
       expect(report.isMock).toBe(true);
       expect(report.historicalPeriods).toHaveLength(3);
-      report.historicalPeriods!.forEach(h => {
-        expect(h).toHaveProperty('periodLabel');
-        expect(h).toHaveProperty('sessions');
-        expect(h).toHaveProperty('activeUsers');
-        expect(h).toHaveProperty('newUsers');
-        expect(h).toHaveProperty('avgSessionDurationSecs');
+      report.historicalPeriods!.forEach((h) => {
+        expect(h).toHaveProperty("periodLabel");
+        expect(h).toHaveProperty("sessions");
+        expect(h).toHaveProperty("activeUsers");
+        expect(h).toHaveProperty("newUsers");
+        expect(h).toHaveProperty("avgSessionDurationSecs");
       });
     });
 
-    it('live mode — historicalPeriods contains summaries for all 3 prior periods', async () => {
-      vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
+    it("live mode — historicalPeriods contains summaries for all 3 prior periods", async () => {
       const emptyMain = { rows: [] };
       const priorTotals = { rows: [makeRow([], ["5000", "3500", "600"])] };
       const priorDuration = { rows: [makeRow([], ["175"])] };
 
       mockRunReport
-        .mockResolvedValueOnce([emptyMain])     // getReportData
-        .mockResolvedValueOnce([emptyMain])     // getAverageSessionDuration (main)
-        .mockResolvedValueOnce([emptyMain])     // getTrafficSourceData
-        .mockResolvedValueOnce([emptyMain])     // getMostViewedPagesData
-        .mockResolvedValueOnce([priorTotals])   // period 1 — totals
-        .mockResolvedValueOnce([priorDuration]) // period 1 — duration
-        .mockResolvedValueOnce([priorTotals])   // period 2 — totals
-        .mockResolvedValueOnce([priorDuration]) // period 2 — duration
-        .mockResolvedValueOnce([priorTotals])   // period 3 — totals
-        .mockResolvedValueOnce([priorDuration]);// period 3 — duration
+        .mockResolvedValueOnce([emptyMain])
+        .mockResolvedValueOnce([emptyMain])
+        .mockResolvedValueOnce([emptyMain])
+        .mockResolvedValueOnce([emptyMain])
+        .mockResolvedValueOnce([priorTotals])
+        .mockResolvedValueOnce([priorDuration])
+        .mockResolvedValueOnce([priorTotals])
+        .mockResolvedValueOnce([priorDuration])
+        .mockResolvedValueOnce([priorTotals])
+        .mockResolvedValueOnce([priorDuration]);
 
-      const report = await getAnalyticsReport("123456789", mockPeriod);
+      const report = await getAnalyticsReport("123456789", mockPeriod, MOCK_CREDENTIALS);
 
       expect(report.isMock).toBe(false);
       expect(report.historicalPeriods).toHaveLength(3);
@@ -280,45 +276,40 @@ describe("getAnalyticsReport", () => {
       expect(report.historicalPeriods![0].activeUsers).toBe(3500);
       expect(report.historicalPeriods![0].newUsers).toBe(600);
       expect(report.historicalPeriods![0].avgSessionDurationSecs).toBe(175);
-      expect(typeof report.historicalPeriods![0].periodLabel).toBe('string');
+      expect(typeof report.historicalPeriods![0].periodLabel).toBe("string");
       expect(report.historicalPeriods![0].periodLabel.length).toBeGreaterThan(0);
     });
 
-    it('live mode — a failed prior period fetch is gracefully excluded', async () => {
-      vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
+    it("live mode — a failed prior period fetch is gracefully excluded", async () => {
       const emptyMain = { rows: [] };
       const priorTotals = { rows: [makeRow([], ["4000", "2800", "500"])] };
       const priorDuration = { rows: [makeRow([], ["160"])] };
 
       mockRunReport
-        .mockResolvedValueOnce([emptyMain])       // getReportData
-        .mockResolvedValueOnce([emptyMain])       // getAverageSessionDuration (main)
-        .mockResolvedValueOnce([emptyMain])       // getTrafficSourceData
-        .mockResolvedValueOnce([emptyMain])       // getMostViewedPagesData
-        .mockResolvedValueOnce([priorTotals])     // period 1 — totals ✓
-        .mockResolvedValueOnce([priorDuration])   // period 1 — duration ✓
-        .mockRejectedValueOnce(new Error("GA4 quota exceeded")) // period 2 — totals ✗
-        .mockResolvedValueOnce([priorDuration])   // period 2 — duration (initiated before rejection resolves; result ignored)
-        .mockResolvedValueOnce([priorTotals])     // period 3 — totals ✓
-        .mockResolvedValueOnce([priorDuration]);  // period 3 — duration ✓
+        .mockResolvedValueOnce([emptyMain])
+        .mockResolvedValueOnce([emptyMain])
+        .mockResolvedValueOnce([emptyMain])
+        .mockResolvedValueOnce([emptyMain])
+        .mockResolvedValueOnce([priorTotals])
+        .mockResolvedValueOnce([priorDuration])
+        .mockRejectedValueOnce(new Error("GA4 quota exceeded"))
+        .mockResolvedValueOnce([priorDuration])
+        .mockResolvedValueOnce([priorTotals])
+        .mockResolvedValueOnce([priorDuration]);
 
-      const report = await getAnalyticsReport("123456789", mockPeriod);
+      const report = await getAnalyticsReport("123456789", mockPeriod, MOCK_CREDENTIALS);
 
-      // Only the 2 successful periods make it into historicalPeriods
       expect(report.historicalPeriods).toHaveLength(2);
       expect(report.isMock).toBe(false);
     });
   });
 
   // -------------------------------------------------------------------------
-  // T017: GA4 error propagation
   it("live mode — SDK error propagates and is not swallowed", async () => {
-    vi.mocked(config).ga4CredentialsJson = '{"type":"service_account"}';
-
     mockRunReport.mockRejectedValue(new Error("GA4 API unavailable"));
 
-    await expect(getAnalyticsReport("123456789", mockPeriod)).rejects.toThrow(
-      "GA4 API unavailable"
-    );
+    await expect(
+      getAnalyticsReport("123456789", mockPeriod, MOCK_CREDENTIALS)
+    ).rejects.toThrow("GA4 API unavailable");
   });
 });
