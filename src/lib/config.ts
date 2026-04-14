@@ -56,17 +56,9 @@ function buildConfig(): AppConfig {
     );
   }
 
-  const ga4CredentialsJson = process.env.GA4_SERVICE_ACCOUNT_JSON ?? null;
-
-  if (env === "production" && !ga4CredentialsJson) {
-    throw new Error(
-      "GA4_SERVICE_ACCOUNT_JSON environment variable is required in production"
-    );
-  }
-
   const logtailToken = process.env.LOGTAIL_SOURCE_TOKEN ?? null;
 
-  return { env, emailMode, testEmail, resendApiKey, resendFrom, databaseUrl, ga4CredentialsJson, logtailToken, mailtrapSmtpUser, mailtrapSmtpPass };
+  return { env, emailMode, testEmail, resendApiKey, resendFrom, databaseUrl, logtailToken, mailtrapSmtpUser, mailtrapSmtpPass };
 }
 
 export const config: AppConfig = buildConfig();

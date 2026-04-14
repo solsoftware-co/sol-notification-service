@@ -23,6 +23,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - Neon PostgreSQL — no schema changes; uses existing `clients.settings JSONB` column (014-notification-preferences)
 - TypeScript 5.x / Node.js 20+ + Inngest ^3.x, React Email (@react-email/components, @react-email/render), Resend ^3.x — all existing; zero new packages (015-flexible-form-fields)
 - Neon PostgreSQL — no schema changes; `notification_logs.metadata` is JSONB and absorbs new fields automatically (015-flexible-form-fields)
+- TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x`, `resend ^3.x`, `@google-analytics/data ^4.x`, `google-auth-library ^10.x` (promote from transitive to direct dep) (016-google-sheets-sink)
+- Neon PostgreSQL — V003 migration adds `google_service_account_email TEXT NULL` and `google_service_account_key TEXT NULL` to `clients` table (016-google-sheets-sink)
 
 ## Project Structure
 
@@ -96,9 +98,9 @@ When adding a new Inngest email workflow, register it in the e2e test suite — 
 Run locally with: `PREVIEW_URL=<url> INNGEST_EVENT_KEY_STAGING=<key> ... npm run test:e2e`
 
 ## Recent Changes
+- 016-google-sheets-sink: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x`, `resend ^3.x`, `@google-analytics/data ^4.x`, `google-auth-library ^10.x` (promote from transitive to direct dep)
 - 015-flexible-form-fields: Added TypeScript 5.x / Node.js 20+ + Inngest ^3.x, React Email (@react-email/components, @react-email/render), Resend ^3.x — all existing; zero new packages
 - 014-notification-preferences: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x`, `resend ^3.x` — all existing; zero new packages
-- 013-analytics-excel-export: Added TypeScript 5.x / Node.js 20+ + `xlsx ^0.18.5` (new) + existing: `inngest ^3.x`, `resend ^3.x`, `@react-email/render`, `pino ^10.x`
 
 
 <!-- MANUAL ADDITIONS START -->

@@ -8,7 +8,6 @@ export interface AppConfig {
   resendApiKey: string | null;
   resendFrom: string;
   databaseUrl: string;
-  ga4CredentialsJson: string | null;
   logtailToken: string | null;
   mailtrapSmtpUser: string | null;
   mailtrapSmtpPass: string | null;
@@ -93,6 +92,8 @@ export interface ClientRow {
   active: boolean;
   settings: Record<string, unknown>;
   created_at: Date | string; // Date from DB; Inngest step serialization yields string
+  google_service_account_email: string | null;
+  google_service_account_key: string | null;
 }
 
 export interface NotificationLogRow {
@@ -156,6 +157,19 @@ export interface BaseEventPayload {
   clientId: string;
 }
 
+export interface GoogleSheetsDestination {
+  /** ID of the target Google Spreadsheet (from the sheet URL). */
+  spreadsheetId: string;
+  /** Tab/sheet name within the spreadsheet. Defaults to the first sheet if omitted. */
+  sheetName?: string;
+  /**
+   * Ordered list of field identifiers mapping submission fields to columns.
+   * Use "_timestamp" for the submission timestamp.
+   * If omitted: writes [timestamp, ...all form fields in received order].
+   */
+  columns?: string[];
+}
+
 export interface FormSubmittedPayload extends BaseEventPayload {
   submitterName?: string;
   submitterEmail?: string;
@@ -166,4 +180,10 @@ export interface FormSubmittedPayload extends BaseEventPayload {
   customFields?: Record<string, string>;
   /** @deprecated Use formName instead. Silently ignored by the notification service. */
   formId?: string;
+  /**
+   * Optional Google Sheets destination. When present (and the client has
+   * credentials registered), the workflow appends a row to the specified
+   * sheet after sending the email.
+   */
+  sheetsDestination?: GoogleSheetsDestination;
 }
