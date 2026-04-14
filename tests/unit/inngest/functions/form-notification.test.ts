@@ -370,3 +370,135 @@ describe("log-result — emailMode test", () => {
     expect(mockWriteNotificationLog).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// T009/T010: sendEmail payload control
+// ---------------------------------------------------------------------------
+
+describe("send-email — sendEmail: false skip", () => {
+  it("returns { skipped: true } and does not call sendEmail when sendEmail: false", async () => {
+    const eventWithSkip = {
+      name: "form/submitted" as const,
+      data: { ...validEvent.data, sendEmail: false },
+    };
+    const tSkip = new InngestTestEngine({
+      function: sendFormNotification,
+      events: [eventWithSkip],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const tWithClient = tSkip.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
+    });
+
+    const output = await tWithClient.executeStep("send-email");
+
+    expect(output.step.op).toBe("StepRun");
+    expect(output.step.data).toEqual({ skipped: true, reason: "sendEmail=false" });
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(mockRenderFormNotification).not.toHaveBeenCalled();
+  });
+
+  it("calls sendEmail when sendEmail: true (explicit)", async () => {
+    vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
+    const eventExplicitTrue = {
+      name: "form/submitted" as const,
+      data: { ...validEvent.data, sendEmail: true },
+    };
+    const tTrue = new InngestTestEngine({
+      function: sendFormNotification,
+      events: [eventExplicitTrue],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const tWithClient = tTrue.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
+    });
+
+    const output = await tWithClient.executeStep("send-email");
+
+    expect(output.step.op).toBe("StepRun");
+    expect(sendEmail).toHaveBeenCalledOnce();
+  });
+
+  it("calls sendEmail when sendEmail is absent (default true)", async () => {
+    vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
+    const tWithClient = t.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
+    });
+
+    await tWithClient.executeStep("send-email");
+
+    expect(sendEmail).toHaveBeenCalledOnce();
+  });
+
+  it("sync-to-google-sheets step still runs when sendEmail: false (controls are independent)", async () => {
+    const sheetsEvent = {
+      name: "form/submitted" as const,
+      data: {
+        ...validEvent.data,
+        sendEmail: false,
+        sheetsDestination: { spreadsheetId: "fake-id" },
+      },
+    };
+    const tSheets = new InngestTestEngine({
+      function: sendFormNotification,
+      events: [sheetsEvent],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const tWithClient = tSheets.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+        { id: "send-email", handler: () => ({ skipped: true, reason: "sendEmail=false" }) },
+      ],
+    });
+
+    // sync-to-google-sheets should still execute (skipped for no credentials, but step runs)
+    const output = await tWithClient.executeStep("sync-to-google-sheets");
+    expect(output.step.op).toBe("StepRun");
+    expect(output.step.data).toEqual(expect.objectContaining({ skipped: true }));
+  });
+});
+
+// T010: sendEmail: false + ctaButton are independent
+describe("send-email — sendEmail: false + ctaButton (controls are independent)", () => {
+  it("no email sent when sendEmail: false even if ctaButton is provided", async () => {
+    const combinedEvent = {
+      name: "form/submitted" as const,
+      data: {
+        ...validEvent.data,
+        sendEmail: false,
+        ctaButton: { text: "Ignored", action: { type: "url" as const, url: "https://example.com" } },
+      },
+    };
+    const tCombined = new InngestTestEngine({
+      function: sendFormNotification,
+      events: [combinedEvent],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const tWithClient = tCombined.clone({
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-recipients", handler: () => ({ recipients: ["owner@acme.com"], source: "client_email" }) },
+      ],
+    });
+
+    const output = await tWithClient.executeStep("send-email");
+
+    expect(output.step.data).toEqual({ skipped: true, reason: "sendEmail=false" });
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(mockRenderFormNotification).not.toHaveBeenCalled();
+  });
+});

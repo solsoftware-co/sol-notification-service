@@ -24,6 +24,8 @@ export type InquiryEmailProps = {
     logText?: string;
     logLink?: string;
     customFields?: Record<string, string>;
+    ctaHref?: string;
+    ctaLabel?: string;
 };
 
 export default function SalesLeadV1Email({
@@ -41,6 +43,8 @@ export default function SalesLeadV1Email({
     logText,
     logLink,
     customFields,
+    ctaHref,
+    ctaLabel,
 }: InquiryEmailProps) {
     const standardFields = [
         ...(customerName  ? [{ label: 'Name',  value: customerName }] : []),
@@ -147,10 +151,10 @@ export default function SalesLeadV1Email({
                         </div>
                     )}
 
-                    {customerEmail && (
+                    {ctaHref && (
                         <CTAButton
-                            href={`mailto:${customerEmail}`}
-                            label={customerName ? `Reply to ${customerName}` : 'Reply'}
+                            href={ctaHref}
+                            label={ctaLabel ?? 'Reply'}
                             variant="black"
                             size="lg"
                             radius="rounded"

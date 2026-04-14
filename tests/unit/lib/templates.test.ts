@@ -50,7 +50,7 @@ vi.mock('../../../src/lib/excel', () => ({
   buildExcelFilename: mockBuildExcelFilename,
 }));
 
-import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle, pageTitle, categorizeSource } from '../../../src/lib/templates';
+import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle, pageTitle, categorizeSource, resolveCta } from '../../../src/lib/templates';
 import type { FormSubmittedPayload, ClientRow, AnalyticsReport, ResolvedPeriod, ReportPeriodPreset } from '../../../src/types/index';
 
 // ---------------------------------------------------------------------------
@@ -69,6 +69,8 @@ const mockClient: ClientRow = {
   active: true,
   settings: {},
   created_at: new Date(),
+  google_service_account_email: null,
+  google_service_account_key: null,
 };
 
 const mockPeriod: ResolvedPeriod = {
@@ -879,6 +881,157 @@ describe('renderAnalyticsReportEmail — historical metric building', () => {
       expect(props.avgDuration.bars).toHaveLength(4);
       expect(props.activeUsers.bars).toHaveLength(4);
       expect(props.newUsers.bars).toHaveLength(4);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveCta
+// ---------------------------------------------------------------------------
+
+describe('resolveCta', () => {
+  describe('no ctaButton provided (default behaviour)', () => {
+    it('submitterEmail + submitterName → default mailto href and "Reply to {name}" label', () => {
+      const result = resolveCta(undefined, 'jane@example.com', 'Jane');
+      expect(result).toEqual({ ctaHref: 'mailto:jane@example.com', ctaLabel: 'Reply to Jane' });
+    });
+
+    it('submitterEmail without submitterName → "Reply" label', () => {
+      const result = resolveCta(undefined, 'jane@example.com', undefined);
+      expect(result).toEqual({ ctaHref: 'mailto:jane@example.com', ctaLabel: 'Reply' });
+    });
+
+    it('no submitterEmail → both undefined (button suppressed)', () => {
+      const result = resolveCta(undefined, undefined, 'Jane');
+      expect(result).toEqual({ ctaHref: undefined, ctaLabel: undefined });
+    });
+  });
+
+  describe('action.type = "url"', () => {
+    it('valid https URL → returns that URL', () => {
+      const result = resolveCta(
+        { text: 'View in CRM', action: { type: 'url', url: 'https://crm.example.com/lead/1' } },
+        'jane@example.com',
+        'Jane',
+      );
+      expect(result).toEqual({ ctaHref: 'https://crm.example.com/lead/1', ctaLabel: 'View in CRM' });
+    });
+
+    it('valid http URL → returns that URL', () => {
+      const result = resolveCta(
+        { action: { type: 'url', url: 'http://internal.example.com' } },
+        'jane@example.com',
+        'Jane',
+      );
+      expect(result.ctaHref).toBe('http://internal.example.com');
+    });
+
+    it('invalid URL (no protocol) → falls back to submitterEmail mailto', () => {
+      const result = resolveCta(
+        { text: 'Broken', action: { type: 'url', url: 'not-a-url' } },
+        'jane@example.com',
+        'Jane',
+      );
+      expect(result).toEqual({ ctaHref: 'mailto:jane@example.com', ctaLabel: 'Reply to Jane' });
+    });
+
+    it('empty URL string → falls back to submitterEmail mailto', () => {
+      const result = resolveCta(
+        { action: { type: 'url', url: '' } },
+        'jane@example.com',
+        'Jane',
+      );
+      expect(result.ctaHref).toBe('mailto:jane@example.com');
+    });
+
+    it('invalid URL + no submitterEmail → both undefined', () => {
+      const result = resolveCta(
+        { action: { type: 'url', url: 'not-a-url' } },
+        undefined,
+        undefined,
+      );
+      expect(result).toEqual({ ctaHref: undefined, ctaLabel: undefined });
+    });
+  });
+
+  describe('action.type = "mailto"', () => {
+    it('email provided → mailto:customEmail', () => {
+      const result = resolveCta(
+        { text: 'Contact Sales', action: { type: 'mailto', email: 'sales@example.com' } },
+        'jane@example.com',
+        'Jane',
+      );
+      expect(result).toEqual({ ctaHref: 'mailto:sales@example.com', ctaLabel: 'Contact Sales' });
+    });
+
+    it('no email, submitterEmail present → mailto:submitterEmail', () => {
+      const result = resolveCta(
+        { action: { type: 'mailto' } },
+        'jane@example.com',
+        'Jane',
+      );
+      expect(result).toEqual({ ctaHref: 'mailto:jane@example.com', ctaLabel: 'Reply to Jane' });
+    });
+
+    it('no email, no submitterEmail → both undefined', () => {
+      const result = resolveCta(
+        { action: { type: 'mailto' } },
+        undefined,
+        undefined,
+      );
+      expect(result).toEqual({ ctaHref: undefined, ctaLabel: undefined });
+    });
+  });
+
+  describe('action absent (text only)', () => {
+    it('ctaButton.text only → uses submitterEmail as href and custom text as label', () => {
+      const result = resolveCta(
+        { text: 'Get Back to Jane' },
+        'jane@example.com',
+        'Jane',
+      );
+      expect(result).toEqual({ ctaHref: 'mailto:jane@example.com', ctaLabel: 'Get Back to Jane' });
+    });
+
+    it('ctaButton.text only, no submitterEmail → both undefined', () => {
+      const result = resolveCta({ text: 'Get Back to Jane' }, undefined, undefined);
+      expect(result).toEqual({ ctaHref: undefined, ctaLabel: undefined });
+    });
+  });
+
+  describe('label resolution', () => {
+    it('empty ctaButton.text → falls back to defaultLabel', () => {
+      const result = resolveCta(
+        { text: '', action: { type: 'url', url: 'https://example.com' } },
+        'jane@example.com',
+        'Jane',
+      );
+      expect(result.ctaLabel).toBe('Reply to Jane');
+    });
+
+    it('whitespace-only ctaButton.text → falls back to defaultLabel', () => {
+      const result = resolveCta(
+        { text: '   ', action: { type: 'url', url: 'https://example.com' } },
+        'jane@example.com',
+        'Jane',
+      );
+      expect(result.ctaLabel).toBe('Reply to Jane');
+    });
+
+    it('ctaButton.text with surrounding whitespace → trims it', () => {
+      const result = resolveCta(
+        { text: '  View Lead  ', action: { type: 'url', url: 'https://example.com' } },
+        'jane@example.com',
+        'Jane',
+      );
+      expect(result.ctaLabel).toBe('View Lead');
+    });
+  });
+
+  describe('button suppressed when no href', () => {
+    it('ctaLabel is undefined when ctaHref is undefined', () => {
+      const result = resolveCta({ text: 'Any Label' }, undefined, undefined);
+      expect(result.ctaLabel).toBeUndefined();
     });
   });
 });

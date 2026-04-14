@@ -177,6 +177,16 @@ export interface RecipientResolutionResult {
   source: "payload" | "settings" | "client_email";
 }
 
+/** Configures the call-to-action button in a form notification email. */
+export type FormNotificationCtaButton = {
+  /** Optional label override for the CTA button. Empty string falls back to default. */
+  text?: string;
+  /** Optional action. Absent = default mailto to submitter's email. */
+  action?:
+    | { type: "url"; url: string }
+    | { type: "mailto"; email?: string };
+};
+
 export interface FormSubmittedPayload extends BaseEventPayload {
   submitterName?: string;
   submitterEmail?: string;
@@ -200,4 +210,16 @@ export interface FormSubmittedPayload extends BaseEventPayload {
    * Invalid entries are discarded; empty array treated as absent.
    */
   recipients?: string[];
+  /**
+   * When false, the email send step is skipped for this submission.
+   * Other steps (e.g. Google Sheets sync) still execute normally.
+   * Defaults to true when omitted.
+   */
+  sendEmail?: boolean;
+  /**
+   * Optional CTA button override for the notification email.
+   * Supports mailto (default) and url action types.
+   * Omitting preserves the default "Reply to {submitter}" button.
+   */
+  ctaButton?: FormNotificationCtaButton;
 }
