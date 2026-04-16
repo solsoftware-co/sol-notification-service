@@ -1,7 +1,12 @@
 import { Img } from '@react-email/components';
 import { spacing } from '../styles';
 
-export function Banner() {
+export interface BannerProps {
+    height?: number;
+    width?: number;
+}
+
+export function Banner({ height, width }: BannerProps = {}) {
     return (
         <table
             width="100%"
@@ -16,7 +21,8 @@ export function Banner() {
                     <Img
                         src="cid:banner_image.png"
                         alt="Sol Software"
-                        height="40"
+                        {...(width !== undefined && height === undefined ? {} : { height: height ?? 40 })}
+                        {...(width !== undefined ? { width } : {})}
                         style={{
                             display: 'block',
                             outline: 'none',

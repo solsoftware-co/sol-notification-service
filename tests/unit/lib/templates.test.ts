@@ -1,6 +1,8 @@
 // T028 / T017: templates module unit tests
 
 const mockReadFile = vi.hoisted(() => vi.fn());
+const mockFetch = vi.hoisted(() => vi.fn());
+const mockLogError = vi.hoisted(() => vi.fn());
 const mockRender = vi.hoisted(() => vi.fn());
 const mockGenerateDailyTrendChart = vi.hoisted(() => vi.fn());
 const mockGenerateTopSourcesGauges = vi.hoisted(() => vi.fn());
@@ -31,6 +33,12 @@ vi.mock('../../../src/lib/config', () => ({
   },
 }));
 
+vi.mock('../../../src/utils/logger', () => ({
+  log: vi.fn(),
+  logError: mockLogError,
+  flush: vi.fn(),
+}));
+
 vi.mock('../../../src/lib/charts', () => ({
   generateDailyTrendChart: mockGenerateDailyTrendChart,
   generateTopSourcesGauges: mockGenerateTopSourcesGauges,
@@ -50,7 +58,7 @@ vi.mock('../../../src/lib/excel', () => ({
   buildExcelFilename: mockBuildExcelFilename,
 }));
 
-import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle, pageTitle, categorizeSource, resolveCta } from '../../../src/lib/templates';
+import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle, pageTitle, categorizeSource, resolveCta, parseBannerConfig, loadBannerAttachment } from '../../../src/lib/templates';
 import type { FormSubmittedPayload, ClientRow, AnalyticsReport, ResolvedPeriod, ReportPeriodPreset } from '../../../src/types/index';
 
 // ---------------------------------------------------------------------------
@@ -103,7 +111,14 @@ const mockReport: AnalyticsReport = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubGlobal('fetch', mockFetch);
   mockReadFile.mockResolvedValue(mockBannerBuffer);
+  // Default fetch stub: successful PNG response
+  mockFetch.mockResolvedValue({
+    ok: true,
+    arrayBuffer: async () => mockBannerBuffer.buffer.slice(mockBannerBuffer.byteOffset, mockBannerBuffer.byteOffset + mockBannerBuffer.byteLength),
+    headers: { get: (h: string) => (h === 'content-type' ? 'image/png' : null) },
+  });
   mockRender.mockResolvedValue(mockHtml);
   mockGenerateDailyTrendChart.mockResolvedValue(mockChartBuffer);
   mockGenerateTopSourcesGauges.mockResolvedValue([mockChartBuffer, mockChartBuffer, mockChartBuffer]);
@@ -1033,5 +1048,333 @@ describe('resolveCta', () => {
       const result = resolveCta({ text: 'Any Label' }, undefined, undefined);
       expect(result.ctaLabel).toBeUndefined();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseBannerConfig — T002 (imageUrl) + T012 (dimensions)
+// ---------------------------------------------------------------------------
+
+describe('parseBannerConfig', () => {
+  it('valid imageUrl (https) → returned as-is', () => {
+    const result = parseBannerConfig({ banner: { imageUrl: 'https://cdn.example.com/logo.png' } });
+    expect(result.imageUrl).toBe('https://cdn.example.com/logo.png');
+  });
+
+  it('valid imageUrl (http) → returned as-is', () => {
+    const result = parseBannerConfig({ banner: { imageUrl: 'http://cdn.example.com/logo.png' } });
+    expect(result.imageUrl).toBe('http://cdn.example.com/logo.png');
+  });
+
+  it('non-URL string → imageUrl excluded from result', () => {
+    const result = parseBannerConfig({ banner: { imageUrl: 'not-a-url' } });
+    expect(result.imageUrl).toBeUndefined();
+  });
+
+  it('ftp:// URL → imageUrl excluded (only http/https allowed)', () => {
+    const result = parseBannerConfig({ banner: { imageUrl: 'ftp://files.example.com/logo.png' } });
+    expect(result.imageUrl).toBeUndefined();
+  });
+
+  it('missing banner key → returns {}', () => {
+    const result = parseBannerConfig({});
+    expect(result).toEqual({});
+  });
+
+  it('banner value is not an object (string) → returns {}', () => {
+    const result = parseBannerConfig({ banner: 'https://cdn.example.com/logo.png' });
+    expect(result).toEqual({});
+  });
+
+  it('banner value is null → returns {}', () => {
+    const result = parseBannerConfig({ banner: null });
+    expect(result).toEqual({});
+  });
+
+  // T012 — dimension validation
+  it('valid height (positive integer) → returned', () => {
+    const result = parseBannerConfig({ banner: { height: 60 } });
+    expect(result.height).toBe(60);
+  });
+
+  it('height: 0 → excluded', () => {
+    const result = parseBannerConfig({ banner: { height: 0 } });
+    expect(result.height).toBeUndefined();
+  });
+
+  it('height: -1 → excluded', () => {
+    const result = parseBannerConfig({ banner: { height: -1 } });
+    expect(result.height).toBeUndefined();
+  });
+
+  it('height: 1.5 (float) → excluded', () => {
+    const result = parseBannerConfig({ banner: { height: 1.5 } });
+    expect(result.height).toBeUndefined();
+  });
+
+  it('valid width (positive integer) → returned', () => {
+    const result = parseBannerConfig({ banner: { width: 200 } });
+    expect(result.width).toBe(200);
+  });
+
+  it('width: 0 → excluded', () => {
+    const result = parseBannerConfig({ banner: { width: 0 } });
+    expect(result.width).toBeUndefined();
+  });
+
+  it('width: -10 → excluded', () => {
+    const result = parseBannerConfig({ banner: { width: -10 } });
+    expect(result.width).toBeUndefined();
+  });
+
+  it('width: 2.7 (float) → excluded', () => {
+    const result = parseBannerConfig({ banner: { width: 2.7 } });
+    expect(result.width).toBeUndefined();
+  });
+
+  it('valid imageUrl + valid height + valid width → all returned', () => {
+    const result = parseBannerConfig({ banner: { imageUrl: 'https://cdn.example.com/logo.png', height: 80, width: 320 } });
+    expect(result.imageUrl).toBe('https://cdn.example.com/logo.png');
+    expect(result.height).toBe(80);
+    expect(result.width).toBe(320);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// loadBannerAttachment — T003
+// ---------------------------------------------------------------------------
+
+describe('loadBannerAttachment', () => {
+  it('no URL → calls readFile with local banner_image.png path', async () => {
+    await loadBannerAttachment(undefined);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockReadFile).toHaveBeenCalledOnce();
+    expect(mockReadFile).toHaveBeenCalledWith(expect.stringContaining('banner_image.png'));
+  });
+
+  it('valid URL → calls fetch with that URL, not readFile', async () => {
+    await loadBannerAttachment('https://cdn.example.com/logo.png');
+    expect(mockFetch).toHaveBeenCalledWith('https://cdn.example.com/logo.png');
+    expect(mockReadFile).not.toHaveBeenCalled();
+  });
+
+  it('valid URL → returns base64 attachment with Content-Type from response header', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => mockBannerBuffer.buffer.slice(mockBannerBuffer.byteOffset, mockBannerBuffer.byteOffset + mockBannerBuffer.byteLength),
+      headers: { get: (h: string) => (h === 'content-type' ? 'image/jpeg' : null) },
+    });
+    const result = await loadBannerAttachment('https://cdn.example.com/logo.jpg');
+    expect(result).not.toBeNull();
+    expect(result!.content_type).toBe('image/jpeg');
+    expect(result!.content).toBe(mockBannerBuffer.toString('base64'));
+  });
+
+  it('valid URL → defaults to image/png when Content-Type header is absent', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => mockBannerBuffer.buffer,
+      headers: { get: () => null },
+    });
+    const result = await loadBannerAttachment('https://cdn.example.com/logo');
+    expect(result!.content_type).toBe('image/png');
+  });
+
+  it('fetch rejects → falls back to readFile (local default)', async () => {
+    mockFetch.mockRejectedValue(new Error('network error'));
+    const result = await loadBannerAttachment('https://cdn.example.com/logo.png');
+    expect(mockReadFile).toHaveBeenCalledOnce();
+    expect(result).not.toBeNull();
+    expect(result!.filename).toBe('banner_image.png');
+  });
+
+  it('fetch rejects AND readFile rejects → returns null', async () => {
+    mockFetch.mockRejectedValue(new Error('network error'));
+    mockReadFile.mockRejectedValue(new Error('file not found'));
+    const result = await loadBannerAttachment('https://cdn.example.com/logo.png');
+    expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderFormNotificationEmail — banner config (T004)
+// ---------------------------------------------------------------------------
+
+describe('renderFormNotificationEmail — banner config', () => {
+  const payload: FormSubmittedPayload = { clientId: 'acme', submitterEmail: 'jane@example.com' };
+
+  it('client with valid imageUrl → fetch called with that URL', async () => {
+    const client = { ...mockClient, settings: { banner: { imageUrl: 'https://cdn.example.com/logo.png' } } };
+    await renderFormNotificationEmail(payload, client);
+    expect(mockFetch).toHaveBeenCalledWith('https://cdn.example.com/logo.png');
+    expect(mockReadFile).not.toHaveBeenCalled();
+  });
+
+  it('client with no banner key → readFile called (local default)', async () => {
+    await renderFormNotificationEmail(payload, mockClient);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockReadFile).toHaveBeenCalledOnce();
+  });
+
+  it('fetch rejects for configured imageUrl → email still resolves without throwing', async () => {
+    mockFetch.mockRejectedValue(new Error('unreachable'));
+    const client = { ...mockClient, settings: { banner: { imageUrl: 'https://cdn.example.com/logo.png' } } };
+    await expect(renderFormNotificationEmail(payload, client)).resolves.toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderFormNotificationEmail — banner dimensions (T013)
+// ---------------------------------------------------------------------------
+
+describe('renderFormNotificationEmail — banner dimensions', () => {
+  const payload: FormSubmittedPayload = { clientId: 'acme', submitterEmail: 'jane@example.com' };
+
+  it('client with banner height and width → passed to SalesLeadV1Email as bannerHeight/bannerWidth', async () => {
+    const client = { ...mockClient, settings: { banner: { imageUrl: 'https://cdn.example.com/logo.png', height: 80, width: 320 } } };
+    await renderFormNotificationEmail(payload, client);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ bannerHeight: 80, bannerWidth: 320 }),
+    );
+  });
+
+  it('client with no banner dims → bannerHeight and bannerWidth are undefined', async () => {
+    await renderFormNotificationEmail(payload, mockClient);
+    expect(mockSalesLeadV1EmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ bannerHeight: undefined, bannerWidth: undefined }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderAnalyticsReportEmail — banner config (T005)
+// ---------------------------------------------------------------------------
+
+describe('renderAnalyticsReportEmail — banner config', () => {
+  it('client with valid imageUrl → fetch called with that URL', async () => {
+    const client = { ...mockClient, settings: { banner: { imageUrl: 'https://cdn.example.com/logo.png' } } };
+    await renderAnalyticsReportEmail(mockReport, client, mockPeriod);
+    expect(mockFetch).toHaveBeenCalledWith('https://cdn.example.com/logo.png');
+    expect(mockReadFile).not.toHaveBeenCalled();
+  });
+
+  it('client with no banner key → readFile called (local default)', async () => {
+    await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockReadFile).toHaveBeenCalledOnce();
+  });
+
+  it('fetch rejects for configured imageUrl → email still resolves without throwing', async () => {
+    mockFetch.mockRejectedValue(new Error('unreachable'));
+    const client = { ...mockClient, settings: { banner: { imageUrl: 'https://cdn.example.com/logo.png' } } };
+    await expect(renderAnalyticsReportEmail(mockReport, client, mockPeriod)).resolves.toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderAnalyticsReportEmail — banner dimensions (T014)
+// ---------------------------------------------------------------------------
+
+describe('renderAnalyticsReportEmail — banner dimensions', () => {
+  it('client with banner height and width → passed to AnalyticsReportV1Email as bannerHeight/bannerWidth', async () => {
+    const client = { ...mockClient, settings: { banner: { imageUrl: 'https://cdn.example.com/logo.png', height: 60, width: 240 } } };
+    await renderAnalyticsReportEmail(mockReport, client, mockPeriod);
+    expect(mockAnalyticsReportEmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ bannerHeight: 60, bannerWidth: 240 }),
+    );
+  });
+
+  it('client with no banner dims → bannerHeight and bannerWidth are undefined', async () => {
+    await renderAnalyticsReportEmail(mockReport, mockClient, mockPeriod);
+    expect(mockAnalyticsReportEmailFn).toHaveBeenCalledWith(
+      expect.objectContaining({ bannerHeight: undefined, bannerWidth: undefined }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T022: parseBannerConfig — logError on invalid fields (US3)
+// ---------------------------------------------------------------------------
+
+describe('parseBannerConfig — logError on invalid fields', () => {
+  it('invalid imageUrl (non-URL string) → logError called', () => {
+    parseBannerConfig({ banner: { imageUrl: 'not-a-url' } });
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.stringContaining('imageUrl'),
+      expect.objectContaining({ value: 'not-a-url' }),
+    );
+  });
+
+  it('invalid imageUrl (ftp:// protocol) → logError called', () => {
+    parseBannerConfig({ banner: { imageUrl: 'ftp://files.example.com/logo.png' } });
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.stringContaining('imageUrl'),
+      expect.anything(),
+    );
+  });
+
+  it('invalid height (zero) → logError called', () => {
+    parseBannerConfig({ banner: { height: 0 } });
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.stringContaining('height'),
+      expect.objectContaining({ value: 0 }),
+    );
+  });
+
+  it('invalid height (negative) → logError called', () => {
+    parseBannerConfig({ banner: { height: -1 } });
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.stringContaining('height'),
+      expect.objectContaining({ value: -1 }),
+    );
+  });
+
+  it('invalid height (float) → logError called', () => {
+    parseBannerConfig({ banner: { height: 1.5 } });
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.stringContaining('height'),
+      expect.objectContaining({ value: 1.5 }),
+    );
+  });
+
+  it('invalid width (zero) → logError called', () => {
+    parseBannerConfig({ banner: { width: 0 } });
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.stringContaining('width'),
+      expect.objectContaining({ value: 0 }),
+    );
+  });
+
+  it('invalid width (negative) → logError called', () => {
+    parseBannerConfig({ banner: { width: -5 } });
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.stringContaining('width'),
+      expect.objectContaining({ value: -5 }),
+    );
+  });
+
+  it('valid fields → logError NOT called', () => {
+    parseBannerConfig({ banner: { imageUrl: 'https://cdn.example.com/logo.png', height: 80, width: 320 } });
+    expect(mockLogError).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T023: loadBannerAttachment — logError on URL fetch failure (US3)
+// ---------------------------------------------------------------------------
+
+describe('loadBannerAttachment — logError on URL fetch failure', () => {
+  it('fetch rejects → logError called with the attempted URL', async () => {
+    mockFetch.mockRejectedValue(new Error('Network unreachable'));
+    await loadBannerAttachment('https://cdn.example.com/logo.png');
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.stringContaining('https://cdn.example.com/logo.png'),
+      expect.anything(),
+    );
+  });
+
+  it('no URL → logError NOT called', async () => {
+    await loadBannerAttachment();
+    expect(mockLogError).not.toHaveBeenCalled();
   });
 });

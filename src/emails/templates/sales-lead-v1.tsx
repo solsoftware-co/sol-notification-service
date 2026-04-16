@@ -26,6 +26,8 @@ export type InquiryEmailProps = {
     customFields?: Record<string, string>;
     ctaHref?: string;
     ctaLabel?: string;
+    bannerHeight?: number;
+    bannerWidth?: number;
 };
 
 export default function SalesLeadV1Email({
@@ -45,6 +47,8 @@ export default function SalesLeadV1Email({
     customFields,
     ctaHref,
     ctaLabel,
+    bannerHeight,
+    bannerWidth,
 }: InquiryEmailProps) {
     const standardFields = [
         ...(customerName  ? [{ label: 'Name',  value: customerName }] : []),
@@ -65,7 +69,7 @@ export default function SalesLeadV1Email({
                 <Preview>{previewText}</Preview>
             </Head>
             <Body style={{ backgroundColor: colors.bg, margin: '0', padding: '0' }}>
-                <Banner />
+                <Banner height={bannerHeight} width={bannerWidth} />
 
                 <EmailContainer>
                     <EmailHeader subheader={subheader} header={header} />

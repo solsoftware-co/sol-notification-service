@@ -157,6 +157,16 @@ export interface BaseEventPayload {
   clientId: string;
 }
 
+/** Per-client banner image configuration stored in clients.settings.banner */
+export interface ClientBannerConfig {
+  /** Absolute URL (http/https) to the banner image to embed in emails. */
+  imageUrl?: string;
+  /** Display height in pixels. Must be a positive integer. Defaults to 40. */
+  height?: number;
+  /** Display width in pixels. Must be a positive integer. No default (natural scaling). */
+  width?: number;
+}
+
 export interface GoogleSheetsDestination {
   /** ID of the target Google Spreadsheet (from the sheet URL). */
   spreadsheetId: string;
