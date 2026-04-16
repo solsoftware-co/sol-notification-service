@@ -8,6 +8,7 @@ import {
   generateTopSourcesGauges,
   generateTopPagesChart,
 } from './charts';
+import type { ClientBannerConfig } from '../types/index';
 import { buildAnalyticsExcel, buildExcelFilename } from './excel';
 import { log, logError } from '../utils/logger';
 import type { ReportPeriodPreset } from '../types/index';
@@ -126,14 +127,81 @@ function buildComparisonLabel(preset: ReportPeriodPreset, count: number): string
   return count === 1 ? `the previous ${unit}` : `the previous ${count} ${unit}s`;
 }
 
-async function loadBannerAttachment(): Promise<EmailAttachment> {
-  const content = await readFile(path.join(process.cwd(), 'assets', 'banner_image.png'));
-  return {
-    filename: 'banner_image.png',
-    content: content.toString('base64'),
-    content_id: 'banner_image.png',
-    content_type: 'image/png',
-  };
+/** Reads client.settings.banner and returns a validated ClientBannerConfig.
+ *  Invalid fields are excluded silently; missing/malformed banner key returns {}. */
+export function parseBannerConfig(settings: Record<string, unknown>): ClientBannerConfig {
+  const raw = settings.banner;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {};
+  }
+  const banner = raw as Record<string, unknown>;
+  const config: ClientBannerConfig = {};
+
+  if (typeof banner.imageUrl === 'string') {
+    try {
+      const parsed = new URL(banner.imageUrl);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        config.imageUrl = banner.imageUrl;
+      } else {
+        logError('parseBannerConfig: invalid imageUrl protocol (must be http or https)', { field: 'imageUrl', value: banner.imageUrl });
+      }
+    } catch {
+      logError('parseBannerConfig: invalid imageUrl (not a parseable URL)', { field: 'imageUrl', value: banner.imageUrl });
+    }
+  }
+
+  if (typeof banner.height === 'number') {
+    if (Number.isInteger(banner.height) && banner.height > 0) {
+      config.height = banner.height;
+    } else {
+      logError('parseBannerConfig: invalid height (must be a positive integer)', { field: 'height', value: banner.height });
+    }
+  }
+
+  if (typeof banner.width === 'number') {
+    if (Number.isInteger(banner.width) && banner.width > 0) {
+      config.width = banner.width;
+    } else {
+      logError('parseBannerConfig: invalid width (must be a positive integer)', { field: 'width', value: banner.width });
+    }
+  }
+
+  return config;
+}
+
+/** Loads the banner image for embedding as a CID inline attachment.
+ *  If imageUrl is provided, fetches from that URL.
+ *  Falls back to the local default on fetch failure.
+ *  Returns null if both the URL fetch and local file read fail. */
+export async function loadBannerAttachment(imageUrl?: string): Promise<EmailAttachment | null> {
+  if (imageUrl) {
+    try {
+      const res = await fetch(imageUrl);
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const contentType = res.headers.get('content-type') ?? 'image/png';
+      return {
+        filename: 'banner_image.png',
+        content: buffer.toString('base64'),
+        content_id: 'banner_image.png',
+        content_type: contentType,
+      };
+    } catch (err) {
+      logError(`loadBannerAttachment: failed to fetch banner from ${imageUrl}`, { url: imageUrl, error: err instanceof Error ? err.message : String(err) });
+      // fall through to local file
+    }
+  }
+
+  try {
+    const content = await readFile(path.join(process.cwd(), 'assets', 'banner_image.png'));
+    return {
+      filename: 'banner_image.png',
+      content: content.toString('base64'),
+      content_id: 'banner_image.png',
+      content_type: 'image/png',
+    };
+  } catch {
+    return null;
+  }
 }
 
 function formatDateMDY(date: string): string {
@@ -199,7 +267,8 @@ export async function renderFormNotificationEmail(
   payload: FormSubmittedPayload,
   client: ClientRow,
 ): Promise<EmailRenderResult> {
-  const banner = await loadBannerAttachment();
+  const bannerConfig = parseBannerConfig(client.settings);
+  const banner = await loadBannerAttachment(bannerConfig.imageUrl);
   const submittedAt = new Date().toLocaleString('en-US', {
     timeZone: 'UTC',
     month: 'short',
@@ -238,10 +307,14 @@ export async function renderFormNotificationEmail(
       customFields: payload.customFields,
       ctaHref,
       ctaLabel,
+      bannerHeight: bannerConfig.height,
+      bannerWidth: bannerConfig.width,
     }),
   );
 
-  return { subject, html, attachments: [banner] };
+  const attachments: EmailAttachment[] = [];
+  if (banner) attachments.push(banner);
+  return { subject, html, attachments };
 }
 
 export async function renderAnalyticsReportEmail(
@@ -249,7 +322,8 @@ export async function renderAnalyticsReportEmail(
   client: ClientRow,
   period: ResolvedPeriod,
 ): Promise<EmailRenderResult> {
-  const banner = await loadBannerAttachment();
+  const bannerConfig = parseBannerConfig(client.settings);
+  const banner = await loadBannerAttachment(bannerConfig.imageUrl);
   const subject = `Your analytics report — ${period.label}`;
   const previewText = `${client.name} — ${period.label}: ${report.sessions.toLocaleString()} sessions`;
 
@@ -333,7 +407,8 @@ export async function renderAnalyticsReportEmail(
     log(`[charts] top pages chart failed: ${e}`);
   }
 
-  const attachments: EmailAttachment[] = [banner];
+  const attachments: EmailAttachment[] = [];
+  if (banner) attachments.push(banner);
   if (dailyChartBuf) {
     attachments.push({
       filename: 'chart_daily.png',
@@ -412,6 +487,8 @@ export async function renderAnalyticsReportEmail(
           }))
         : undefined,
       pagesChart: pagesChartBuf ? 'cid:chart_pages' : undefined,
+      bannerHeight: bannerConfig.height,
+      bannerWidth: bannerConfig.width,
     }),
   );
 

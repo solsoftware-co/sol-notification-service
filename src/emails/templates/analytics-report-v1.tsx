@@ -27,6 +27,8 @@ export type AnalyticsEmailProps = {
     dailyChart?: string;
     sourcesGauges?: Array<{ cid: string; label: string; pct: number; sessions: string }>;
     pagesChart?: string;
+    bannerHeight?: number;
+    bannerWidth?: number;
 };
 
 export default function AnalyticsReportV1Email({
@@ -44,6 +46,8 @@ export default function AnalyticsReportV1Email({
     dailyChart,
     sourcesGauges,
     pagesChart,
+    bannerHeight,
+    bannerWidth,
 }: AnalyticsEmailProps) {
     return (
         <Html>
@@ -51,7 +55,7 @@ export default function AnalyticsReportV1Email({
                 <Preview>{previewText}</Preview>
             </Head>
             <Body style={{ backgroundColor: colors.bg, margin: '0', padding: '0' }}>
-                <Banner />
+                <Banner height={bannerHeight} width={bannerWidth} />
                 <EmailContainer>
                     <EmailHeader subheader={subheader} header={header} periodLabel={periodLabel} />
                     <SectionDivider />
