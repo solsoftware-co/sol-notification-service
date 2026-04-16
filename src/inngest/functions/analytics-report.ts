@@ -11,6 +11,7 @@ import type {
   ResolvedPeriod,
   ReportPeriod,
   AnalyticsReport,
+  ClientBannerConfig,
 } from "../../types/index";
 
 // ---------------------------------------------------------------------------
@@ -166,41 +167,44 @@ export const sendAnalyticsReport = inngest.createFunction(
     const result = await step.run("send-email", async () => {
       const { recipients } = resolveRecipients(client, "analytics_report");
       const rendered = await renderAnalyticsReportEmail(report, client, resolvedPeriod);
-      return sendEmail({
+      const emailResult = await sendEmail({
         to: recipients,
         subject: rendered.subject,
         html: rendered.html,
         attachments: rendered.attachments,
       });
+      return { ...emailResult, banner: rendered.banner };
     });
 
     await step.run("log-result", async () => {
+      const emailResult = result as typeof result & { banner?: ClientBannerConfig };
       log("Workflow completed", {
         clientId,
         preset: data.reportPeriod.preset,
         resolvedPeriod,
-        mode: result.mode,
-        outcome: result.outcome,
-        originalTo: result.originalTo,
+        mode: emailResult.mode,
+        outcome: emailResult.outcome,
+        originalTo: emailResult.originalTo,
         isMock: report.isMock,
       } as any);
       if (config.emailMode === "live") {
-        const recipientEmail = Array.isArray(result.originalTo)
-          ? result.originalTo.join(", ")
-          : result.originalTo;
+        const recipientEmail = Array.isArray(emailResult.originalTo)
+          ? emailResult.originalTo.join(", ")
+          : emailResult.originalTo;
         await writeNotificationLog({
           client_id: clientId,
           workflow: "send-analytics-report",
           event_name: "analytics/report.requested",
-          outcome: result.outcome === "sent" ? "sent" : "failed",
+          outcome: emailResult.outcome === "sent" ? "sent" : "failed",
           recipient_email: recipientEmail,
-          subject: result.subject,
-          resend_id: result.resendId,
+          subject: emailResult.subject,
+          resend_id: emailResult.resendId,
           metadata: {
             ga4_property_id: client.ga4_property_id,
             period_preset: data.reportPeriod.preset,
             date_range_start: resolvedPeriod.start,
             date_range_end: resolvedPeriod.end,
+            ...(emailResult.banner ? { banner: emailResult.banner } : {}),
           },
         });
       }

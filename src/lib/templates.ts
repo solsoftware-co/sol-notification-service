@@ -314,7 +314,8 @@ export async function renderFormNotificationEmail(
 
   const attachments: EmailAttachment[] = [];
   if (banner) attachments.push(banner);
-  return { subject, html, attachments };
+  const bannerSnapshot = Object.keys(bannerConfig).length > 0 ? bannerConfig : undefined;
+  return { subject, html, attachments, banner: bannerSnapshot };
 }
 
 export async function renderAnalyticsReportEmail(
@@ -492,5 +493,6 @@ export async function renderAnalyticsReportEmail(
     }),
   );
 
-  return { subject, html, previewText, attachments };
+  const bannerSnapshot = Object.keys(bannerConfig).length > 0 ? bannerConfig : undefined;
+  return { subject, html, previewText, attachments, banner: bannerSnapshot };
 }

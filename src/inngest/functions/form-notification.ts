@@ -6,7 +6,7 @@ import { appendSheetRow } from "../../lib/sheets";
 import { resolveRecipients } from "../../lib/notifications";
 import { renderFormNotificationEmail } from "../../lib/templates";
 import { log } from "../../utils/logger";
-import type { FormSubmittedPayload, EmailResult } from "../../types/index";
+import type { FormSubmittedPayload, EmailResult, ClientBannerConfig } from "../../types/index";
 
 const REQUIRED_FIELDS: (keyof FormSubmittedPayload)[] = [
   "clientId",
@@ -67,12 +67,13 @@ export const sendFormNotification = inngest.createFunction(
         return { skipped: true, reason: "sendEmail=false" } as const;
       }
       const rendered = await renderFormNotificationEmail(data, client);
-      return sendEmail({
+      const emailResult = await sendEmail({
         to: recipients,
         subject: rendered.subject,
         html: rendered.html,
         attachments: rendered.attachments,
       });
+      return { ...emailResult, banner: rendered.banner };
     });
 
     const sheetsOutcome = await step.run("sync-to-google-sheets", async () => {
@@ -100,7 +101,7 @@ export const sendFormNotification = inngest.createFunction(
         log("Workflow completed — email skipped", { clientId, reason: result.reason });
         return;
       }
-      const emailResult = result as EmailResult;
+      const emailResult = result as EmailResult & { banner?: ClientBannerConfig };
       log("Workflow completed", {
         clientId,
         mode: emailResult.mode,
@@ -119,7 +120,7 @@ export const sendFormNotification = inngest.createFunction(
           recipient_email: recipientEmail,
           subject: emailResult.subject,
           resend_id: emailResult.resendId,
-          metadata: { formData: data, sheets_outcome: sheetsOutcome, recipient_source: recipientSource },
+          metadata: { formData: data, sheets_outcome: sheetsOutcome, recipient_source: recipientSource, ...(emailResult.banner ? { banner: emailResult.banner } : {}) },
         });
       }
     });
