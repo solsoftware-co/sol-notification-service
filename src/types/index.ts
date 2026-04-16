@@ -134,6 +134,7 @@ export interface EmailRenderResult {
   html: string;
   previewText?: string;
   attachments: EmailAttachment[];
+  banner?: ClientBannerConfig;
 }
 
 export interface EmailRequest {
