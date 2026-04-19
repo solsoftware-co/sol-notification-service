@@ -27,7 +27,7 @@ vi.mock("../../../src/utils/logger", () => ({
   flush: vi.fn(),
 }));
 
-import { appendSheetRow, resolveRow } from "../../../src/lib/sheets";
+import { appendSheetRow, buildRange, resolveRow } from "../../../src/lib/sheets";
 import { JWT } from "google-auth-library";
 import type { GoogleSheetsDestination } from "../../../src/types/index";
 
@@ -46,6 +46,31 @@ const BASE_FIELDS = {
 };
 
 const TIMESTAMP = "2026-04-13T09:00:00.000Z";
+
+// ---------------------------------------------------------------------------
+// buildRange — range string construction
+// ---------------------------------------------------------------------------
+
+describe("buildRange", () => {
+  it("returns 'A1' when neither sheetName nor tableAnchor is provided", () => {
+    expect(buildRange(BASE_DESTINATION)).toBe("A1");
+  });
+
+  it("prefixes sheetName when provided and tableAnchor is absent", () => {
+    const dest: GoogleSheetsDestination = { ...BASE_DESTINATION, sheetName: "Sheet1" };
+    expect(buildRange(dest)).toBe("Sheet1!A1");
+  });
+
+  it("uses tableAnchor when provided and sheetName is absent", () => {
+    const dest: GoogleSheetsDestination = { ...BASE_DESTINATION, tableAnchor: "B2" };
+    expect(buildRange(dest)).toBe("B2");
+  });
+
+  it("combines sheetName and tableAnchor when both are provided", () => {
+    const dest: GoogleSheetsDestination = { ...BASE_DESTINATION, sheetName: "Inquiry Log", tableAnchor: "B2" };
+    expect(buildRange(dest)).toBe("Inquiry Log!B2");
+  });
+});
 
 // ---------------------------------------------------------------------------
 // resolveRow — column mapping logic

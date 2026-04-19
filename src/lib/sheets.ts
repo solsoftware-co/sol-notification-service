@@ -27,6 +27,11 @@ async function getSheetsAccessToken(credentialsJson: string): Promise<string> {
   return tokenResponse.token;
 }
 
+export function buildRange(destination: GoogleSheetsDestination): string {
+  const cell = destination.tableAnchor ?? "A1";
+  return destination.sheetName ? `${destination.sheetName}!${cell}` : cell;
+}
+
 export function resolveRow(
   destination: GoogleSheetsDestination,
   fields: Record<string, string>,
@@ -49,7 +54,7 @@ export async function appendSheetRow(
   try {
     const accessToken = await getSheetsAccessToken(credentialsJson);
     const row = resolveRow(destination, fields, timestamp);
-    const range = destination.sheetName ? `${destination.sheetName}!A1` : "A1";
+    const range = buildRange(destination);
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${destination.spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
     const response = await fetch(url, {

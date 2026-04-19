@@ -179,6 +179,8 @@ export interface GoogleSheetsDestination {
    * If omitted: writes [timestamp, ...all form fields in received order].
    */
   columns?: string[];
+  /** Cell reference for the top-left corner of the target table, e.g. "B2". Defaults to "A1". */
+  tableAnchor?: string;
 }
 
 export interface RecipientResolutionResult {
