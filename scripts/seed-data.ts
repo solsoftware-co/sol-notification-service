@@ -7,6 +7,7 @@ const clients = [
     email: "test-acme@example.com",
     ga4_property_id: "123456789", // numeric ID only — analytics.ts prefixes "properties/" internally
     active: true,
+    timezone: "America/Chicago", // Central Time (default)
     settings: {
       notifications: {
         // form_submitted: two recipients — exercises multi-recipient send path
@@ -22,7 +23,26 @@ const clients = [
     email: "test-globex@example.com",
     ga4_property_id: null, // intentionally no GA4 — tests the "not configured" error path
     active: true,
+    timezone: "America/New_York", // Eastern Time
     settings: {}, // no notifications key — exercises the client.email fallback path
+  },
+  {
+    id: "client-initech",
+    name: "Initech LLC",
+    email: "test-initech@example.com",
+    ga4_property_id: "987654321",
+    active: true,
+    timezone: "America/Los_Angeles", // Pacific Time
+    settings: {},
+  },
+  {
+    id: "client-umbrella",
+    name: "Umbrella Corp",
+    email: "test-umbrella@example.com",
+    ga4_property_id: "555666777",
+    active: true,
+    timezone: "America/Denver", // Mountain Time
+    settings: {},
   },
 ];
 
@@ -31,11 +51,12 @@ async function seed(): Promise<void> {
 
   for (const client of clients) {
     await db.query(
-      `INSERT INTO clients (id, name, email, ga4_property_id, active, settings)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO clients (id, name, email, ga4_property_id, active, timezone, settings)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (id) DO UPDATE SET
          ga4_property_id = EXCLUDED.ga4_property_id,
          active = EXCLUDED.active,
+         timezone = EXCLUDED.timezone,
          settings = EXCLUDED.settings`,
       [
         client.id,
@@ -43,6 +64,7 @@ async function seed(): Promise<void> {
         client.email,
         client.ga4_property_id,
         client.active,
+        client.timezone,
         JSON.stringify(client.settings),
       ]
     );

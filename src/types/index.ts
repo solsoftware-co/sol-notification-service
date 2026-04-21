@@ -1,4 +1,17 @@
 export type AppEnv = "development" | "preview" | "production";
+
+export const SUPPORTED_TIMEZONES = [
+  "America/New_York",    // Eastern Time (EST/EDT)
+  "America/Chicago",     // Central Time (CST/CDT) — default
+  "America/Denver",      // Mountain Time (MST/MDT)
+  "America/Los_Angeles", // Pacific Time (PST/PDT)
+] as const;
+
+export type SupportedTimezone = typeof SUPPORTED_TIMEZONES[number];
+
+export function isValidTimezone(tz: unknown): tz is SupportedTimezone {
+  return SUPPORTED_TIMEZONES.includes(tz as SupportedTimezone);
+}
 export type EmailMode = "mock" | "test" | "live" | "mailtrap";
 
 export interface AppConfig {
@@ -82,6 +95,12 @@ export interface AnalyticsReportRequestedPayload extends BaseEventPayload {
   scheduledAt: string;    // ISO 8601 timestamp — used for preset resolution
   topSourcesLimit?: number; // overrides per-preset default (last_week=5, others=10)
   topPagesLimit?: number;   // overrides per-preset default (last_week=5, last_month=20, others=20)
+  /**
+   * When true, the worker waits until 9 AM in the client's local timezone on the
+   * next business day before sending. Set by schedulers; defaults to false so
+   * manual triggers send immediately.
+   */
+  enforceDeliveryWindow?: boolean;
 }
 
 export interface ClientRow {
@@ -94,6 +113,7 @@ export interface ClientRow {
   created_at: Date | string; // Date from DB; Inngest step serialization yields string
   google_service_account_email: string | null;
   google_service_account_key: string | null;
+  timezone: SupportedTimezone;
 }
 
 export interface NotificationLogRow {

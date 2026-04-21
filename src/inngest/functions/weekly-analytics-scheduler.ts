@@ -9,7 +9,7 @@ export const weeklyAnalyticsScheduler = inngest.createFunction(
     retries: 2,
     concurrency: { limit: 1, scope: "fn" },
   },
-  [{ cron: "0 9 * * 2" }, { event: "analytics/weekly.scheduled" }],
+  [{ cron: "0 0 * * 2" }, { event: "analytics/weekly.scheduled" }],
   async ({ step }) => {
     log("Weekly analytics scheduler started", { env: config.env } as any);
 
@@ -35,6 +35,7 @@ export const weeklyAnalyticsScheduler = inngest.createFunction(
         clientId: client.id,
         reportPeriod: { preset: "last_week" as const },
         scheduledAt,
+        enforceDeliveryWindow: true,
       },
     }));
 

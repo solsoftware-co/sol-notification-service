@@ -1,4 +1,4 @@
-// T014 + T015 + T019 + T029: analytics-report unit tests
+// T014 + T015 + T019 + T029 + T008(022): analytics-report unit tests
 
 const mockGetClientById = vi.hoisted(() => vi.fn());
 const mockGetAnalyticsReport = vi.hoisted(() => vi.fn());
@@ -60,6 +60,7 @@ import type {
   AnalyticsReport,
   EmailResult,
   ResolvedPeriod,
+  SupportedTimezone,
 } from "../../../../src/types/index";
 
 // ---------------------------------------------------------------------------
@@ -79,6 +80,7 @@ const mockClient: ClientRow = {
   created_at: new Date(),
   google_service_account_email: null,
   google_service_account_key: null,
+  timezone: "America/Chicago",
 };
 
 const mockResolvedPeriod: ResolvedPeriod = {
@@ -136,11 +138,27 @@ const t = new InngestTestEngine({
   transformCtx: (ctx: any) => mockCtx(ctx),
 });
 
-// Fresh engine per test — avoids @inngest/test step result caching between tests
+// Factory for executeStep() calls targeting steps AFTER wait-for-send-window.
+// Fresh engine per test avoids @inngest/test mockHandlerCache pollution across tests.
+function freshAfterSleepEngine(events?: any[]) {
+  return new InngestTestEngine({
+    function: sendAnalyticsReport,
+    events: events ?? [baseEvent],
+    steps: [
+      { id: "resolve-send-time", handler: () => scheduledAt },
+      { id: "wait-for-send-window", handler: () => undefined },
+    ],
+    transformCtx: (ctx: any) => mockCtx(ctx),
+  });
+}
+
+// Fresh engine per test — avoids @inngest/test step result caching between tests.
+// wait-for-send-window (sleepUntil) must be pre-mocked so execute() doesn't hang.
 function freshEngine() {
   return new InngestTestEngine({
     function: sendAnalyticsReport,
     events: [baseEvent],
+    steps: [{ id: "wait-for-send-window", handler: () => undefined }],
     transformCtx: (ctx: any) => mockCtx(ctx),
   });
 }
@@ -234,7 +252,7 @@ describe("resolve-report-period — last_week", () => {
     // scheduledAt = 2026-02-24 (Tuesday)
     // end   = scheduledAt - 2 days = 2026-02-22 (Sunday)
     // start = scheduledAt - 8 days = 2026-02-16 (Monday)
-    const output = await t.executeStep("resolve-report-period");
+    const output = await freshAfterSleepEngine().executeStep("resolve-report-period");
 
     expect(output.step.op).toBe("StepRun");
     expect(output.step.data).toEqual({
@@ -254,19 +272,9 @@ describe("resolve-report-period — last_month", () => {
   it("resolves to the full prior calendar month when scheduledAt is in February 2026", async () => {
     // scheduledAt = 2026-02-24 → previous month = January 2026
     // start = 2026-01-01, end = 2026-01-31
-    const tLastMonth = t.clone({
-      events: [
-        {
-          ...baseEvent,
-          data: {
-            ...baseEvent.data,
-            reportPeriod: { preset: "last_month" as const },
-          },
-        },
-      ],
-    });
-
-    const output = await tLastMonth.executeStep("resolve-report-period");
+    const output = await freshAfterSleepEngine([
+      { ...baseEvent, data: { ...baseEvent.data, reportPeriod: { preset: "last_month" as const } } },
+    ]).executeStep("resolve-report-period");
 
     expect(output.step.op).toBe("StepRun");
     expect(output.step.data).toEqual({
@@ -287,19 +295,9 @@ describe("resolve-report-period — last_30_days", () => {
     // scheduledAt = 2026-02-24
     // yesterday   = 2026-02-23  → end
     // start       = 2026-02-23 - 29 days = 2026-01-25
-    const tLast30 = t.clone({
-      events: [
-        {
-          ...baseEvent,
-          data: {
-            ...baseEvent.data,
-            reportPeriod: { preset: "last_30_days" as const },
-          },
-        },
-      ],
-    });
-
-    const output = await tLast30.executeStep("resolve-report-period");
+    const output = await freshAfterSleepEngine([
+      { ...baseEvent, data: { ...baseEvent.data, reportPeriod: { preset: "last_30_days" as const } } },
+    ]).executeStep("resolve-report-period");
 
     expect(output.step.op).toBe("StepRun");
     expect(output.step.data).toMatchObject({
@@ -316,23 +314,9 @@ describe("resolve-report-period — last_30_days", () => {
 
 describe("resolve-report-period — custom", () => {
   it("uses verbatim start and end when both are provided", async () => {
-    const tCustom = t.clone({
-      events: [
-        {
-          ...baseEvent,
-          data: {
-            ...baseEvent.data,
-            reportPeriod: {
-              preset: "custom" as const,
-              start: "2026-01-01",
-              end: "2026-01-15",
-            },
-          },
-        },
-      ],
-    });
-
-    const output = await tCustom.executeStep("resolve-report-period");
+    const output = await freshAfterSleepEngine([
+      { ...baseEvent, data: { ...baseEvent.data, reportPeriod: { preset: "custom" as const, start: "2026-01-01", end: "2026-01-15" } } },
+    ]).executeStep("resolve-report-period");
 
     expect(output.step.op).toBe("StepRun");
     expect(output.step.data).toMatchObject({
@@ -349,38 +333,18 @@ describe("resolve-report-period — custom", () => {
 
 describe("resolve-report-period — failure", () => {
   it("throws for unknown preset", async () => {
-    const tUnknown = t.clone({
-      events: [
-        {
-          ...baseEvent,
-          data: {
-            ...baseEvent.data,
-            reportPeriod: { preset: "unknown_preset" as any },
-          },
-        },
-      ],
-    });
-
-    const output = await tUnknown.executeStep("resolve-report-period");
+    const output = await freshAfterSleepEngine([
+      { ...baseEvent, data: { ...baseEvent.data, reportPeriod: { preset: "unknown_preset" as any } } },
+    ]).executeStep("resolve-report-period");
 
     expect(output.step.op).toBe("StepError");
     expect((output.step.error as any)?.message).toContain("Unknown report period preset");
   });
 
   it("throws for custom preset when end is missing", async () => {
-    const tCustomNoEnd = t.clone({
-      events: [
-        {
-          ...baseEvent,
-          data: {
-            ...baseEvent.data,
-            reportPeriod: { preset: "custom" as const, start: "2026-01-01" },
-          },
-        },
-      ],
-    });
-
-    const output = await tCustomNoEnd.executeStep("resolve-report-period");
+    const output = await freshAfterSleepEngine([
+      { ...baseEvent, data: { ...baseEvent.data, reportPeriod: { preset: "custom" as const, start: "2026-01-01" } } },
+    ]).executeStep("resolve-report-period");
 
     expect(output.step.op).toBe("StepError");
     expect((output.step.error as any)?.message).toContain("start");
@@ -388,19 +352,9 @@ describe("resolve-report-period — failure", () => {
   });
 
   it("throws for custom preset when start is missing", async () => {
-    const tCustomNoStart = t.clone({
-      events: [
-        {
-          ...baseEvent,
-          data: {
-            ...baseEvent.data,
-            reportPeriod: { preset: "custom" as const, end: "2026-01-15" },
-          },
-        },
-      ],
-    });
-
-    const output = await tCustomNoStart.executeStep("resolve-report-period");
+    const output = await freshAfterSleepEngine([
+      { ...baseEvent, data: { ...baseEvent.data, reportPeriod: { preset: "custom" as const, end: "2026-01-15" } } },
+    ]).executeStep("resolve-report-period");
 
     expect(output.step.op).toBe("StepError");
     expect((output.step.error as any)?.message).toContain("start");
@@ -415,7 +369,7 @@ describe("fetch-analytics-data — GA4 error propagation", () => {
   it("propagates GA4 API error without swallowing", async () => {
     mockGetAnalyticsReport.mockRejectedValue(new Error("GA4 API unavailable"));
 
-    const output = await t.executeStep("fetch-analytics-data");
+    const output = await freshAfterSleepEngine().executeStep("fetch-analytics-data");
 
     expect(output.step.op).toBe("StepError");
     expect((output.step.error as any)?.message).toBe("GA4 API unavailable");
@@ -423,12 +377,12 @@ describe("fetch-analytics-data — GA4 error propagation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// T014: Happy path — full execute (last_week, all 6 steps)
+// T014: Happy path — full execute (last_week, all steps)
 // ---------------------------------------------------------------------------
 
 describe("full execute — happy path, last_week", () => {
   it("completes all steps and returns the expected result payload", async () => {
-    const { result } = await t.execute();
+    const { result } = await freshEngine().execute();
 
     expect(result).toMatchObject({
       clientId: "client-1",
@@ -444,7 +398,7 @@ describe("full execute — happy path, last_week", () => {
   });
 
   it("calls renderAnalyticsReportEmail with report, client, and resolved period", async () => {
-    await t.execute();
+    await freshEngine().execute();
 
     expect(mockRenderAnalyticsReport).toHaveBeenCalledWith(
       expect.objectContaining({ sessions: 100, isMock: true }),
@@ -454,7 +408,7 @@ describe("full execute — happy path, last_week", () => {
   });
 
   it("calls sendEmail with resolved recipients and resolved period label in subject", async () => {
-    await t.execute();
+    await freshEngine().execute();
 
     expect(mockSendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -477,6 +431,8 @@ describe("send-email — notification preferences", () => {
     const tWithClient = t.clone({
       steps: [
         { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-send-time", handler: () => scheduledAt },
+        { id: "wait-for-send-window", handler: () => undefined },
         { id: "resolve-report-period", handler: () => mockResolvedPeriod },
         { id: "fetch-analytics-data", handler: () => mockReport },
       ],
@@ -496,6 +452,8 @@ describe("send-email — notification preferences", () => {
     const tWithClient = t.clone({
       steps: [
         { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-send-time", handler: () => scheduledAt },
+        { id: "wait-for-send-window", handler: () => undefined },
         { id: "resolve-report-period", handler: () => mockResolvedPeriod },
         { id: "fetch-analytics-data", handler: () => mockReport },
       ],
@@ -516,7 +474,7 @@ describe("send-email — notification preferences", () => {
 
 describe("check-ga4-config — client has GA4 property", () => {
   it("does not skip — function completes and sends email", async () => {
-    const { result } = await t.execute();
+    const { result } = await freshEngine().execute();
 
     expect(result).toMatchObject({ clientId: "client-1", outcome: "logged" });
     expect(mockSendEmail).toHaveBeenCalledOnce();
@@ -543,7 +501,12 @@ describe("check-ga4-config — client has no GA4 property, emailMode live", () =
     (config as any).emailMode = "live";
     mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
 
-    const { result } = await freshEngine().execute();
+    const { result } = await new InngestTestEngine({
+      function: sendAnalyticsReport,
+      events: [baseEvent],
+      steps: [{ id: "wait-for-send-window", handler: () => undefined }],
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    }).execute();
 
     expect(result).toMatchObject({ clientId: "client-1", outcome: "skipped" });
     expect(mockSendEmail).not.toHaveBeenCalled();
@@ -576,6 +539,7 @@ describe("check-ga4-config — client has no GA4 property, emailMode live", () =
     const engine = new InngestTestEngine({
       function: sendAnalyticsReport,
       events: [{ ...baseEvent, data: { ...baseEvent.data, reportPeriod: { preset: "last_month" as const } } }],
+      steps: [{ id: "wait-for-send-window", handler: () => undefined }],
       transformCtx: (ctx: any) => mockCtx(ctx),
     });
     await engine.execute();
@@ -620,7 +584,7 @@ describe("log-result — emailMode live", () => {
 
 describe("log-result — emailMode mock", () => {
   it("does not call writeNotificationLog", async () => {
-    await t.execute();
+    await freshEngine().execute();
 
     expect(mockWriteNotificationLog).not.toHaveBeenCalled();
   });
@@ -630,8 +594,115 @@ describe("log-result — emailMode test", () => {
   it("does not call writeNotificationLog", async () => {
     (config as any).emailMode = "test";
 
-    await t.execute();
+    await freshEngine().execute();
 
     expect(mockWriteNotificationLog).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T008 (022): resolve-send-time step — timezone-aware 9 AM computation
+// Use fresh InngestTestEngine (not t.clone) to avoid cached step results from prior tests.
+// ---------------------------------------------------------------------------
+
+describe("resolve-send-time — ET winter (EST UTC-5)", () => {
+  it("returns 14:00 UTC = 9 AM ET on a Monday when scheduledAt is midnight UTC", async () => {
+    // Feb 2, 2026 = Monday; midnight UTC → local date in ET = Feb 1 → next9am = Feb 2 14:00 UTC
+    const engine = new InngestTestEngine({
+      function: sendAnalyticsReport,
+      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-02-02T00:00:00.000Z", enforceDeliveryWindow: true } }],
+      steps: [{ id: "fetch-client-config", handler: () => ({ ...mockClient, timezone: "America/New_York" as SupportedTimezone }) }],
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const output = await engine.executeStep("resolve-send-time");
+    expect(output.step.op).toBe("StepRun");
+    expect(output.step.data).toBe("2026-02-02T14:00:00.000Z");
+  });
+});
+
+describe("resolve-send-time — ET summer (EDT UTC-4)", () => {
+  it("returns 13:00 UTC = 9 AM ET on a Thursday when scheduledAt is midnight UTC in July", async () => {
+    // Jul 2, 2026 = Thursday; midnight UTC → local date in ET = Jul 1 → next9am = Jul 2 13:00 UTC
+    const engine = new InngestTestEngine({
+      function: sendAnalyticsReport,
+      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-07-02T00:00:00.000Z", enforceDeliveryWindow: true } }],
+      steps: [{ id: "fetch-client-config", handler: () => ({ ...mockClient, timezone: "America/New_York" as SupportedTimezone }) }],
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const output = await engine.executeStep("resolve-send-time");
+    expect(output.step.op).toBe("StepRun");
+    expect(output.step.data).toBe("2026-07-02T13:00:00.000Z");
+  });
+});
+
+describe("resolve-send-time — PT winter (PST UTC-8)", () => {
+  it("returns 17:00 UTC = 9 AM PT on a Monday when scheduledAt is midnight UTC", async () => {
+    const engine = new InngestTestEngine({
+      function: sendAnalyticsReport,
+      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-02-02T00:00:00.000Z", enforceDeliveryWindow: true } }],
+      steps: [{ id: "fetch-client-config", handler: () => ({ ...mockClient, timezone: "America/Los_Angeles" as SupportedTimezone }) }],
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const output = await engine.executeStep("resolve-send-time");
+    expect(output.step.op).toBe("StepRun");
+    expect(output.step.data).toBe("2026-02-02T17:00:00.000Z");
+  });
+});
+
+describe("resolve-send-time — weekend deferral", () => {
+  it("defers Saturday+Sunday and returns Monday 9 AM ET", async () => {
+    // Apr 4 2026 = Saturday midnight UTC → next9am lands on Apr 4 (Sat) → defer
+    // → Apr 5 (Sun) → defer → Apr 6 (Mon) 13:00 UTC (EDT)
+    const engine = new InngestTestEngine({
+      function: sendAnalyticsReport,
+      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-04-04T00:00:00.000Z", enforceDeliveryWindow: true } }],
+      steps: [{ id: "fetch-client-config", handler: () => ({ ...mockClient, timezone: "America/New_York" as SupportedTimezone }) }],
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    });
+    const output = await engine.executeStep("resolve-send-time");
+    expect(output.step.op).toBe("StepRun");
+    expect(output.step.data).toBe("2026-04-06T13:00:00.000Z");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T008 (022): wait-for-send-window — sleepUntil called with resolved time
+// Use executeStep (not execute) to avoid the sleepUntil spy firing on every replay.
+// ---------------------------------------------------------------------------
+
+describe("wait-for-send-window — sleepUntil called with resolved send time", () => {
+  it("calls step.sleepUntil with the ISO string from resolve-send-time", async () => {
+    const sleepUntilCalls: Array<{ id: string; until: string }> = [];
+
+    const engine = new InngestTestEngine({
+      function: sendAnalyticsReport,
+      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-02-02T00:00:00.000Z", enforceDeliveryWindow: true } }],
+      steps: [
+        { id: "fetch-client-config", handler: () => ({ ...mockClient, timezone: "America/Chicago" as SupportedTimezone }) },
+        { id: "resolve-send-time", handler: () => "2026-02-02T15:00:00.000Z" },
+      ],
+      transformCtx: (ctx: any) => {
+        const base = mockCtx(ctx);
+        return {
+          ...base,
+          step: {
+            ...base.step,
+            sleepUntil: async (id: string, until: any) => {
+              sleepUntilCalls.push({ id, until: until instanceof Date ? until.toISOString() : until });
+              // Call through so @inngest/test's checkpoint mechanism records the op correctly
+              return base.step.sleepUntil(id, until);
+            },
+          },
+        };
+      },
+    });
+
+    await engine.executeStep("wait-for-send-window");
+
+    expect(sleepUntilCalls).toHaveLength(1);
+    expect(sleepUntilCalls[0]).toEqual({
+      id: "wait-for-send-window",
+      until: "2026-02-02T15:00:00.000Z",
+    });
   });
 });

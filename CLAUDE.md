@@ -30,6 +30,10 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - Neon PostgreSQL — no schema changes; `clients.settings` JSONB absorbs the new `banner` sub-key (019-client-email-banner)
 - TypeScript 5.x / Node.js 20+ + `inngest ^3.x` — no new packages required (021-monthly-analytics-scheduler)
 - No schema changes; no DB reads beyond the existing `getAllActiveClients()` call (021-monthly-analytics-scheduler)
+- TypeScript 5.x / Node.js 20+ + `google-auth-library ^10.x` (existing), Node.js native `fetch` (existing) (021-sheets-range-anchor)
+- N/A — no schema changes (021-sheets-range-anchor)
+- TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x` — no new packages required (022-client-timezone)
+- Neon PostgreSQL — V004 migration adds `timezone TEXT NOT NULL DEFAULT 'America/Chicago'` to `clients` (022-client-timezone)
 
 ## Project Structure
 
@@ -45,7 +49,9 @@ src/
 │   └── email.ts                    # Email abstraction (mock/test/live routing)
 ├── utils/
 │   ├── logger.ts                   # Pino logger — exports log(), logError(), flush(). Never import pino directly.
-│   └── email-preview.ts            # Mock mode: writes HTML to .email-preview/last.html
+│   ├── email-preview.ts            # Mock mode: writes HTML to .email-preview/last.html
+│   ├── business-days.ts            # US federal holiday set + isNonHolidayWeekday()
+│   └── timezone.ts                 # DST-aware timezone helpers: localDateStr(), next9amInTimezone(), isNonHolidayWeekdayInTz()
 └── inngest/
     ├── client.ts                   # Inngest client (id: "notification-service")
     └── functions/
@@ -103,9 +109,10 @@ When adding a new Inngest email workflow, register it in the e2e test suite — 
 Run locally with: `PREVIEW_URL=<url> INNGEST_EVENT_KEY_STAGING=<key> ... npm run test:e2e`
 
 ## Recent Changes
+- 022-client-timezone: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x` — no new packages required
+- 021-sheets-range-anchor: `GoogleSheetsDestination` gains optional `tableAnchor?: string` field; `buildRange()` helper extracted in `src/lib/sheets.ts` — no new packages, no DB changes
 - 021-monthly-analytics-scheduler: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` — no new packages required
 - 019-client-email-banner: Added TypeScript 5.x / Node.js 20+ + `@react-email/components`, `@react-email/render` (existing); Node.js 20 native `fetch` (no new packages)
-- 017-payload-recipients: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x`, `resend ^3.x` — all existing; zero new packages
 
 
 <!-- MANUAL ADDITIONS START -->
