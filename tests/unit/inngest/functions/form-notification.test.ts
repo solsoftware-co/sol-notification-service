@@ -40,6 +40,7 @@ vi.mock("../../../../src/utils/logger", () => ({
   log: vi.fn(),
   logError: vi.fn(),
   flush: vi.fn(),
+  setRunContext: vi.fn(),
 }));
 
 // Imports after mocks
