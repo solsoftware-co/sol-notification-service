@@ -35,6 +35,7 @@ export const monthlyAnalyticsScheduler = inngest.createFunction(
         clientId: client.id,
         reportPeriod: { preset: "last_month" as const },
         scheduledAt,
+        enforceDeliveryWindow: true,
       },
     }));
 

@@ -610,7 +610,7 @@ describe("resolve-send-time — ET winter (EST UTC-5)", () => {
     // Feb 2, 2026 = Monday; midnight UTC → local date in ET = Feb 1 → next9am = Feb 2 14:00 UTC
     const engine = new InngestTestEngine({
       function: sendAnalyticsReport,
-      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-02-02T00:00:00.000Z" } }],
+      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-02-02T00:00:00.000Z", enforceDeliveryWindow: true } }],
       steps: [{ id: "fetch-client-config", handler: () => ({ ...mockClient, timezone: "America/New_York" as SupportedTimezone }) }],
       transformCtx: (ctx: any) => mockCtx(ctx),
     });
@@ -625,7 +625,7 @@ describe("resolve-send-time — ET summer (EDT UTC-4)", () => {
     // Jul 2, 2026 = Thursday; midnight UTC → local date in ET = Jul 1 → next9am = Jul 2 13:00 UTC
     const engine = new InngestTestEngine({
       function: sendAnalyticsReport,
-      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-07-02T00:00:00.000Z" } }],
+      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-07-02T00:00:00.000Z", enforceDeliveryWindow: true } }],
       steps: [{ id: "fetch-client-config", handler: () => ({ ...mockClient, timezone: "America/New_York" as SupportedTimezone }) }],
       transformCtx: (ctx: any) => mockCtx(ctx),
     });
@@ -639,7 +639,7 @@ describe("resolve-send-time — PT winter (PST UTC-8)", () => {
   it("returns 17:00 UTC = 9 AM PT on a Monday when scheduledAt is midnight UTC", async () => {
     const engine = new InngestTestEngine({
       function: sendAnalyticsReport,
-      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-02-02T00:00:00.000Z" } }],
+      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-02-02T00:00:00.000Z", enforceDeliveryWindow: true } }],
       steps: [{ id: "fetch-client-config", handler: () => ({ ...mockClient, timezone: "America/Los_Angeles" as SupportedTimezone }) }],
       transformCtx: (ctx: any) => mockCtx(ctx),
     });
@@ -655,7 +655,7 @@ describe("resolve-send-time — weekend deferral", () => {
     // → Apr 5 (Sun) → defer → Apr 6 (Mon) 13:00 UTC (EDT)
     const engine = new InngestTestEngine({
       function: sendAnalyticsReport,
-      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-04-04T00:00:00.000Z" } }],
+      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-04-04T00:00:00.000Z", enforceDeliveryWindow: true } }],
       steps: [{ id: "fetch-client-config", handler: () => ({ ...mockClient, timezone: "America/New_York" as SupportedTimezone }) }],
       transformCtx: (ctx: any) => mockCtx(ctx),
     });
@@ -676,7 +676,7 @@ describe("wait-for-send-window — sleepUntil called with resolved send time", (
 
     const engine = new InngestTestEngine({
       function: sendAnalyticsReport,
-      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-02-02T00:00:00.000Z" } }],
+      events: [{ ...baseEvent, data: { ...baseEvent.data, scheduledAt: "2026-02-02T00:00:00.000Z", enforceDeliveryWindow: true } }],
       steps: [
         { id: "fetch-client-config", handler: () => ({ ...mockClient, timezone: "America/Chicago" as SupportedTimezone }) },
         { id: "resolve-send-time", handler: () => "2026-02-02T15:00:00.000Z" },

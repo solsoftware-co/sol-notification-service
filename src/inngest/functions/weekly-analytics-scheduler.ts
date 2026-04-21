@@ -35,6 +35,7 @@ export const weeklyAnalyticsScheduler = inngest.createFunction(
         clientId: client.id,
         reportPeriod: { preset: "last_week" as const },
         scheduledAt,
+        enforceDeliveryWindow: true,
       },
     }));
 

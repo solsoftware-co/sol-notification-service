@@ -105,6 +105,7 @@ describe("fan-out — production, 3 clients", () => {
       expect(ev.data.clientId).toBe(clients[i].id);
       expect(ev.data.reportPeriod).toEqual({ preset: "last_month" });
       expect(typeof ev.data.scheduledAt).toBe("string");
+      expect(ev.data.enforceDeliveryWindow).toBe(true);
       // scheduledAt is a valid ISO timestamp
       expect(() => new Date(ev.data.scheduledAt)).not.toThrow();
     });

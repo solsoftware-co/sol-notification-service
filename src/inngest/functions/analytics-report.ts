@@ -119,24 +119,26 @@ export const sendAnalyticsReport = inngest.createFunction(
       return getClientById(clientId);
     });
 
-    const sendTime = await step.run("resolve-send-time", async () => {
-      const tz = client.timezone ?? "America/Chicago";
-      const from = new Date(data.scheduledAt);
-      log("Resolving send time", { clientId, timezone: tz, scheduledAt: data.scheduledAt } as any);
+    if (data.enforceDeliveryWindow) {
+      const sendTime = await step.run("resolve-send-time", async () => {
+        const tz = client.timezone ?? "America/Chicago";
+        const from = new Date(data.scheduledAt);
+        log("Resolving send time", { clientId, timezone: tz, scheduledAt: data.scheduledAt } as any);
 
-      let candidate = next9amInTimezone(tz, from);
-      for (let i = 0; i < 7; i++) {
-        if (isNonHolidayWeekdayInTz(candidate, tz)) {
-          return candidate.toISOString();
+        let candidate = next9amInTimezone(tz, from);
+        for (let i = 0; i < 7; i++) {
+          if (isNonHolidayWeekdayInTz(candidate, tz)) {
+            return candidate.toISOString();
+          }
+          candidate = new Date(candidate.getTime() + 24 * 60 * 60 * 1000);
         }
-        candidate = new Date(candidate.getTime() + 24 * 60 * 60 * 1000);
-      }
 
-      log("resolve-send-time: no valid business day found in 7 iterations — sending immediately", { clientId } as any);
-      return data.scheduledAt;
-    });
+        log("resolve-send-time: no valid business day found in 7 iterations — sending immediately", { clientId } as any);
+        return data.scheduledAt;
+      });
 
-    await step.sleepUntil("wait-for-send-window", sendTime);
+      await step.sleepUntil("wait-for-send-window", sendTime);
+    }
 
     const skipped = await step.run("check-ga4-config", async () => {
       // Only skip in live mode — in test/mailtrap/mock modes, analytics.ts returns

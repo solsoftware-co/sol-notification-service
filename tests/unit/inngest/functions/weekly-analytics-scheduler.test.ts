@@ -152,6 +152,7 @@ describe("fan-out — full execute, production, 3 clients", () => {
       expect(ev.data.clientId).toBe(clients[i].id);
       expect(ev.data.reportPeriod).toEqual({ preset: "last_week" });
       expect(typeof ev.data.scheduledAt).toBe("string");
+      expect(ev.data.enforceDeliveryWindow).toBe(true);
     });
     expect((result as any).dispatched).toBe(3);
   });

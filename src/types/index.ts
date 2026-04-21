@@ -95,6 +95,12 @@ export interface AnalyticsReportRequestedPayload extends BaseEventPayload {
   scheduledAt: string;    // ISO 8601 timestamp — used for preset resolution
   topSourcesLimit?: number; // overrides per-preset default (last_week=5, others=10)
   topPagesLimit?: number;   // overrides per-preset default (last_week=5, last_month=20, others=20)
+  /**
+   * When true, the worker waits until 9 AM in the client's local timezone on the
+   * next business day before sending. Set by schedulers; defaults to false so
+   * manual triggers send immediately.
+   */
+  enforceDeliveryWindow?: boolean;
 }
 
 export interface ClientRow {
