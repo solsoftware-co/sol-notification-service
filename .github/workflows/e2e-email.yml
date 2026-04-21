@@ -120,11 +120,13 @@ jobs:
           MAILTRAP_INBOX_ID: ${{ secrets.MAILTRAP_INBOX_ID }}
 
   # ── Step 3b: Run form notification e2e tests (if affected) ────────────────
+  # Runs after weekly-analytics (even if skipped) to avoid Mailtrap rate limits
   e2e-form-notification:
-    needs: [detect-changes, wait-for-deployment]
+    needs: [detect-changes, wait-for-deployment, e2e-weekly-analytics]
     if: |
       always() &&
       needs.wait-for-deployment.result == 'success' &&
+      (needs.e2e-weekly-analytics.result == 'success' || needs.e2e-weekly-analytics.result == 'skipped') &&
       (needs.detect-changes.outputs.form-notification == 'true' ||
        needs.detect-changes.outputs.shared == 'true')
     runs-on: ubuntu-latest
