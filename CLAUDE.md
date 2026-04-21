@@ -49,7 +49,9 @@ src/
 │   └── email.ts                    # Email abstraction (mock/test/live routing)
 ├── utils/
 │   ├── logger.ts                   # Pino logger — exports log(), logError(), flush(). Never import pino directly.
-│   └── email-preview.ts            # Mock mode: writes HTML to .email-preview/last.html
+│   ├── email-preview.ts            # Mock mode: writes HTML to .email-preview/last.html
+│   ├── business-days.ts            # US federal holiday set + isNonHolidayWeekday()
+│   └── timezone.ts                 # DST-aware timezone helpers: localDateStr(), next9amInTimezone(), isNonHolidayWeekdayInTz()
 └── inngest/
     ├── client.ts                   # Inngest client (id: "notification-service")
     └── functions/

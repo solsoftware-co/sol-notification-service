@@ -6,6 +6,7 @@ import { sendEmail } from "../../lib/email";
 import { resolveRecipients } from "../../lib/notifications";
 import { renderAnalyticsReportEmail, buildReportTitle } from "../../lib/templates";
 import { log } from "../../utils/logger";
+import { next9amInTimezone, isNonHolidayWeekdayInTz } from "../../utils/timezone";
 import type {
   AnalyticsReportRequestedPayload,
   ResolvedPeriod,
@@ -117,6 +118,25 @@ export const sendAnalyticsReport = inngest.createFunction(
     const client = await step.run("fetch-client-config", async () => {
       return getClientById(clientId);
     });
+
+    const sendTime = await step.run("resolve-send-time", async () => {
+      const tz = client.timezone ?? "America/Chicago";
+      const from = new Date(data.scheduledAt);
+      log("Resolving send time", { clientId, timezone: tz, scheduledAt: data.scheduledAt } as any);
+
+      let candidate = next9amInTimezone(tz, from);
+      for (let i = 0; i < 7; i++) {
+        if (isNonHolidayWeekdayInTz(candidate, tz)) {
+          return candidate.toISOString();
+        }
+        candidate = new Date(candidate.getTime() + 24 * 60 * 60 * 1000);
+      }
+
+      log("resolve-send-time: no valid business day found in 7 iterations — sending immediately", { clientId } as any);
+      return data.scheduledAt;
+    });
+
+    await step.sleepUntil("wait-for-send-window", sendTime);
 
     const skipped = await step.run("check-ga4-config", async () => {
       // Only skip in live mode — in test/mailtrap/mock modes, analytics.ts returns

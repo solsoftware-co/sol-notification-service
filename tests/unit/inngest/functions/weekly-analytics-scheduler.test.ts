@@ -43,6 +43,9 @@ function makeClient(id: string, email: string): ClientRow {
     active: true,
     settings: {},
     created_at: new Date(),
+    google_service_account_email: null,
+    google_service_account_key: null,
+    timezone: "America/Chicago",
   };
 }
 
