@@ -1,9 +1,20 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import pino from "pino";
 import { config } from "../lib/config";
 
-interface LogContext {
+interface RunContext {
+  runId: string;
   clientId?: string;
+}
+
+interface LogContext {
   [key: string]: unknown;
+}
+
+const storage = new AsyncLocalStorage<RunContext>();
+
+export function setRunContext(ctx: RunContext): void {
+  storage.enterWith(ctx);
 }
 
 const isDev = config.env === "development";
@@ -25,7 +36,7 @@ const pinoLogger = pino({
 });
 
 export function log(message: string, context?: LogContext): void {
-  pinoLogger.info({ ...context }, message);
+  pinoLogger.info({ ...storage.getStore(), ...context }, message);
 }
 
 export function logError(
@@ -33,7 +44,7 @@ export function logError(
   error: unknown,
   context?: LogContext
 ): void {
-  pinoLogger.error({ ...(context ?? {}), err: error }, message);
+  pinoLogger.error({ ...storage.getStore(), ...(context ?? {}), err: error }, message);
 }
 
 export function flush(): void {

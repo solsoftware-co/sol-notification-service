@@ -235,7 +235,7 @@ export async function getAnalyticsReport(
   options: AnalyticsReportOptions = {}
 ): Promise<AnalyticsReport> {
   if (!credentialsJson || !propertyId) {
-    log("[analytics] GA4 not fully configured (missing credentials or property ID) — returning mock data");
+    log(`GA4 not configured for property ${propertyId || "(none)"} — returning mock data`);
     return mockReport(period);
   }
 
@@ -244,6 +244,7 @@ export async function getAnalyticsReport(
   const pagesLimit = options.topPagesLimit ?? defaults.pages;
   const { start, end } = period;
 
+  log(`Querying GA4 property ${propertyId} for period ${start} – ${end}`);
   const [dailyData, durationData, sourcesData, pagesData] = await Promise.all([
     getReportData(credentialsJson, propertyId, start, end),
     getAverageSessionDuration(credentialsJson, propertyId, start, end),

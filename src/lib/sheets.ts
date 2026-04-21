@@ -57,6 +57,7 @@ export async function appendSheetRow(
     const range = buildRange(destination);
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${destination.spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
+    log(`Appending row to sheet ${destination.spreadsheetId} — range: ${range}`);
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -75,17 +76,11 @@ export async function appendSheetRow(
       updates?: { updatedRows?: number };
     };
     const rowsAppended = body.updates?.updatedRows ?? 1;
-    log("[sheets] Row appended", {
-      spreadsheetId: destination.spreadsheetId,
-      rowsAppended,
-    });
+    log(`Row appended to sheet ${destination.spreadsheetId} — ${rowsAppended} row(s) written`);
     return { success: true, rowsAppended };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logError("[sheets] Failed to append row", {
-      error: message,
-      spreadsheetId: destination.spreadsheetId,
-    });
+    logError(`Failed to append row to sheet ${destination.spreadsheetId}: ${message}`, err);
     return { success: false, error: message };
   }
 }

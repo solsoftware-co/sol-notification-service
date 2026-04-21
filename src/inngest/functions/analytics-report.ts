@@ -5,7 +5,7 @@ import { getAnalyticsReport } from "../../lib/analytics";
 import { sendEmail } from "../../lib/email";
 import { resolveRecipients } from "../../lib/notifications";
 import { renderAnalyticsReportEmail, buildReportTitle } from "../../lib/templates";
-import { log } from "../../utils/logger";
+import { log, setRunContext } from "../../utils/logger";
 import { next9amInTimezone, isNonHolidayWeekdayInTz } from "../../utils/timezone";
 import type {
   AnalyticsReportRequestedPayload,
@@ -105,9 +105,11 @@ export const sendAnalyticsReport = inngest.createFunction(
     retries: 3,
   },
   { event: "analytics/report.requested" },
-  async ({ event, step }) => {
+  async ({ event, step, runId }) => {
     const data = event.data as AnalyticsReportRequestedPayload;
     const clientId = data?.clientId;
+
+    setRunContext({ runId, clientId });
 
     await step.run("validate-payload", async () => {
       if (!clientId) {
@@ -121,9 +123,10 @@ export const sendAnalyticsReport = inngest.createFunction(
 
     if (data.enforceDeliveryWindow) {
       const sendTime = await step.run("resolve-send-time", async () => {
+        setRunContext({ runId, clientId });
         const tz = client.timezone ?? "America/Chicago";
         const from = new Date(data.scheduledAt);
-        log("Resolving send time", { clientId, timezone: tz, scheduledAt: data.scheduledAt } as any);
+        log(`Resolving delivery window for client ${clientId} — timezone: ${tz}`);
 
         let candidate = next9amInTimezone(tz, from);
         for (let i = 0; i < 7; i++) {
@@ -133,7 +136,7 @@ export const sendAnalyticsReport = inngest.createFunction(
           candidate = new Date(candidate.getTime() + 24 * 60 * 60 * 1000);
         }
 
-        log("resolve-send-time: no valid business day found in 7 iterations — sending immediately", { clientId } as any);
+        log(`No valid business day found in 7 days for client ${clientId} — sending immediately`);
         return data.scheduledAt;
       });
 
@@ -167,14 +170,11 @@ export const sendAnalyticsReport = inngest.createFunction(
       return resolvePeriod(data.reportPeriod, data.scheduledAt);
     });
 
-    log("Workflow started", {
-      clientId,
-      env: config.env,
-      preset: data.reportPeriod.preset,
-      resolvedPeriod,
-    } as any);
+    log(`Analytics report started for client ${clientId} — period: ${resolvedPeriod.preset} (${resolvedPeriod.label})`);
 
     const report = await step.run("fetch-analytics-data", async () => {
+      setRunContext({ runId, clientId });
+      log(`Querying GA4 property ${client.ga4_property_id ?? "(none)"} for client ${clientId}`);
       return getAnalyticsReport(
         client.ga4_property_id!,
         resolvedPeriod,
@@ -187,8 +187,11 @@ export const sendAnalyticsReport = inngest.createFunction(
     });
 
     const result = await step.run("send-email", async () => {
+      setRunContext({ runId, clientId });
       const { recipients } = resolveRecipients(client, "analytics_report");
       const rendered = await renderAnalyticsReportEmail(report, client, resolvedPeriod);
+      const toLabel = Array.isArray(recipients) ? recipients.join(", ") : recipients;
+      log(`Sending analytics report email to ${toLabel}`);
       const emailResult = await sendEmail({
         to: recipients,
         subject: rendered.subject,
@@ -199,16 +202,10 @@ export const sendAnalyticsReport = inngest.createFunction(
     });
 
     await step.run("log-result", async () => {
+      setRunContext({ runId, clientId });
       const emailResult = result as typeof result & { banner?: ClientBannerConfig };
-      log("Workflow completed", {
-        clientId,
-        preset: data.reportPeriod.preset,
-        resolvedPeriod,
-        mode: emailResult.mode,
-        outcome: emailResult.outcome,
-        originalTo: emailResult.originalTo,
-        isMock: report.isMock,
-      } as any);
+      const sentTo = Array.isArray(emailResult.originalTo) ? emailResult.originalTo.join(", ") : emailResult.originalTo;
+      log(`Analytics report sent to ${sentTo} — outcome: ${emailResult.outcome}`);
       if (config.emailMode === "live") {
         const recipientEmail = Array.isArray(emailResult.originalTo)
           ? emailResult.originalTo.join(", ")

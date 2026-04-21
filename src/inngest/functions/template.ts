@@ -13,7 +13,7 @@ import { inngest } from "../client";
 import { config } from "../../lib/config";
 import { getClientById } from "../../lib/db";
 import { sendEmail } from "../../lib/email";
-import { log, logError } from "../../utils/logger";
+import { log, logError, setRunContext } from "../../utils/logger";
 import type { BaseEventPayload } from "../../types/index";
 
 export const templateFunction = inngest.createFunction(
@@ -22,18 +22,18 @@ export const templateFunction = inngest.createFunction(
     retries: 3,
   },
   { event: "template/triggered" },
-  async ({ event, step }) => {
+  async ({ event, step, runId }) => {
     const { clientId } = event.data as BaseEventPayload;
 
-    await step.run("log-start", async () => {
-      log("Workflow started", { clientId, eventName: event.name, env: config.env });
-    });
+    setRunContext({ runId, clientId });
+    log(`template/triggered received for client ${clientId}`);
 
     const client = await step.run("fetch-client-config", async () => {
       return getClientById(clientId);
     });
 
     const result = await step.run("send-email", async () => {
+      log(`Sending template notification to ${client.email}`);
       return sendEmail({
         to: client.email,
         subject: "Notification from the template",
@@ -42,12 +42,7 @@ export const templateFunction = inngest.createFunction(
     });
 
     await step.run("log-result", async () => {
-      log("Workflow completed", {
-        clientId,
-        mode: result.mode,
-        outcome: result.outcome,
-        originalTo: result.originalTo,
-      });
+      log(`Template notification sent to ${result.originalTo} — outcome: ${result.outcome}`);
     });
 
     return { clientId, outcome: result.outcome };
