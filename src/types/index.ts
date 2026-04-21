@@ -158,6 +158,9 @@ export interface BaseEventPayload {
   clientId: string;
 }
 
+/** Manual trigger payload for analytics/monthly.scheduled — no required fields. */
+export interface MonthlyScheduledPayload {}
+
 /** Per-client banner image configuration stored in clients.settings.banner */
 export interface ClientBannerConfig {
   /** Absolute URL (http/https) to the banner image to embed in emails. */
