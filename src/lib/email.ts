@@ -42,7 +42,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   const toLabel = Array.isArray(request.to) ? request.to.join(", ") : request.to;
 
   if (mode === "mock") {
-    log(`[mock] Would send to: ${toLabel} | Subject: ${request.subject} | Body length: ${request.html.length} chars`);
+    log(`Mock email to ${toLabel} — subject: ${request.subject}`);
     writeEmailPreview({ to: toLabel, subject: request.subject, html: request.html, attachments: request.attachments });
     return {
       mode,
@@ -76,7 +76,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
       html: request.html,
       ...(attachments?.length ? { attachments } : {}),
     });
-    log(`[mailtrap] Sent to: ${toLabel} | Subject: ${subject}`);
+    log(`Mailtrap email sent to ${toLabel} — subject: ${subject}`);
     return {
       mode,
       originalTo: request.to,
@@ -93,6 +93,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
       ? `[TEST: ${toLabel}] ${request.subject}`
       : request.subject;
 
+  log(`Sending email to ${toLabel} — subject: ${subject}`);
   const resend = getResendClient();
   const attachments = request.attachments && request.attachments.length > 0
     ? request.attachments.map((a: EmailAttachment) => ({
@@ -118,9 +119,9 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   }
 
   if (mode === "test") {
-    log(`[test] Redirected to: ${actualTo} (original: ${toLabel}) | Subject: ${subject}`);
+    log(`Test email redirected to ${actualTo} (original: ${toLabel}) — subject: ${subject}`);
   } else {
-    log(`[live] Sent to: ${toLabel} | Resend ID: ${data!.id}`);
+    log(`Email sent to ${toLabel} — Resend ID: ${data!.id}`);
   }
 
   return {

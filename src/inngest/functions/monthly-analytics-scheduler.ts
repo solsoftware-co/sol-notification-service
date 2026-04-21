@@ -1,7 +1,7 @@
 import { inngest } from "../client";
 import { config } from "../../lib/config";
 import { getAllActiveClients } from "../../lib/db";
-import { log } from "../../utils/logger";
+import { log, setRunContext } from "../../utils/logger";
 
 export const monthlyAnalyticsScheduler = inngest.createFunction(
   {
@@ -10,8 +10,9 @@ export const monthlyAnalyticsScheduler = inngest.createFunction(
     concurrency: { limit: 1, scope: "fn" },
   },
   [{ cron: "0 0 2 * *" }, { event: "analytics/monthly.scheduled" }],
-  async ({ step }) => {
-    log("Monthly analytics scheduler started", { env: config.env } as any);
+  async ({ step, runId }) => {
+    setRunContext({ runId });
+    log(`Monthly analytics scheduler triggered — env: ${config.env}`);
 
     const clients = await step.run("fetch-active-clients", async () => {
       return getAllActiveClients({
@@ -20,12 +21,12 @@ export const monthlyAnalyticsScheduler = inngest.createFunction(
       });
     });
 
-    log(`Fetched ${clients.length} active client(s)`, { env: config.env } as any);
-
     if (clients.length === 0) {
-      log("No active clients to report on — skipping fan-out");
+      log("No active clients found — skipping monthly fan-out");
       return { dispatched: 0, env: config.env };
     }
+
+    log(`Fetched ${clients.length} active client(s) — dispatching monthly reports`);
 
     const scheduledAt = new Date().toISOString();
 
@@ -41,9 +42,7 @@ export const monthlyAnalyticsScheduler = inngest.createFunction(
 
     const { ids } = await step.sendEvent("fan-out-report-events", events);
 
-    log(`Dispatched ${ids.length} monthly analytics report event(s)`, {
-      env: config.env,
-    } as any);
+    log(`Dispatched ${ids.length} monthly analytics report event(s)`);
 
     return { dispatched: ids.length, env: config.env };
   }

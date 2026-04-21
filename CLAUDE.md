@@ -34,6 +34,7 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - N/A — no schema changes (021-sheets-range-anchor)
 - TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x` — no new packages required (022-client-timezone)
 - Neon PostgreSQL — V004 migration adds `timezone TEXT NOT NULL DEFAULT 'America/Chicago'` to `clients` (022-client-timezone)
+- TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `pino ^9.x`, `@logtail/pino ^3.x` — all existing; zero new packages (023-improve-function-logging)
 
 ## Project Structure
 
@@ -109,10 +110,9 @@ When adding a new Inngest email workflow, register it in the e2e test suite — 
 Run locally with: `PREVIEW_URL=<url> INNGEST_EVENT_KEY_STAGING=<key> ... npm run test:e2e`
 
 ## Recent Changes
+- 023-improve-function-logging: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `pino ^9.x`, `@logtail/pino ^3.x` — all existing; zero new packages
 - 022-client-timezone: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x` — no new packages required
 - 021-sheets-range-anchor: `GoogleSheetsDestination` gains optional `tableAnchor?: string` field; `buildRange()` helper extracted in `src/lib/sheets.ts` — no new packages, no DB changes
-- 021-monthly-analytics-scheduler: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x` — no new packages required
-- 019-client-email-banner: Added TypeScript 5.x / Node.js 20+ + `@react-email/components`, `@react-email/render` (existing); Node.js 20 native `fetch` (no new packages)
 
 
 <!-- MANUAL ADDITIONS START -->

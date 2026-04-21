@@ -5,7 +5,7 @@ import { sendEmail } from "../../lib/email";
 import { appendSheetRow } from "../../lib/sheets";
 import { resolveRecipients } from "../../lib/notifications";
 import { renderFormNotificationEmail } from "../../lib/templates";
-import { log } from "../../utils/logger";
+import { log, setRunContext } from "../../utils/logger";
 import type { FormSubmittedPayload, EmailResult, ClientBannerConfig } from "../../types/index";
 
 const REQUIRED_FIELDS: (keyof FormSubmittedPayload)[] = [
@@ -40,11 +40,12 @@ export const sendFormNotification = inngest.createFunction(
     retries: 3,
   },
   { event: "form/submitted" },
-  async ({ event, step }) => {
+  async ({ event, step, runId }) => {
     const data = event.data as FormSubmittedPayload;
     const clientId = data.clientId;
 
-    log("Workflow started", { clientId, eventName: event.name, env: config.env });
+    setRunContext({ runId, clientId });
+    log(`form/submitted received for client ${clientId}`);
 
     await step.run("validate-payload", async () => {
       for (const field of REQUIRED_FIELDS) {
@@ -63,10 +64,13 @@ export const sendFormNotification = inngest.createFunction(
     });
 
     const result = await step.run("send-email", async () => {
+      setRunContext({ runId, clientId });
       if (data.sendEmail === false) {
         return { skipped: true, reason: "sendEmail=false" } as const;
       }
       const rendered = await renderFormNotificationEmail(data, client);
+      const toLabel = Array.isArray(recipients) ? recipients.join(", ") : recipients;
+      log(`Sending form notification email to ${toLabel}`);
       const emailResult = await sendEmail({
         to: recipients,
         subject: rendered.subject,
@@ -77,6 +81,7 @@ export const sendFormNotification = inngest.createFunction(
     });
 
     const sheetsOutcome = await step.run("sync-to-google-sheets", async () => {
+      setRunContext({ runId, clientId });
       if (!data.sheetsDestination) {
         return { skipped: true, reason: "no destination in payload" };
       }
@@ -97,17 +102,14 @@ export const sendFormNotification = inngest.createFunction(
     });
 
     await step.run("log-result", async () => {
+      setRunContext({ runId, clientId });
       if ("skipped" in result && result.skipped) {
-        log("Workflow completed — email skipped", { clientId, reason: result.reason });
+        log(`Form notification skipped for client ${clientId} — ${result.reason}`);
         return;
       }
       const emailResult = result as EmailResult & { banner?: ClientBannerConfig };
-      log("Workflow completed", {
-        clientId,
-        mode: emailResult.mode,
-        outcome: emailResult.outcome,
-        originalTo: emailResult.originalTo,
-      });
+      const sentTo = Array.isArray(emailResult.originalTo) ? emailResult.originalTo.join(", ") : emailResult.originalTo;
+      log(`Form notification sent to ${sentTo} — outcome: ${emailResult.outcome}`);
       if (config.emailMode === "live") {
         const recipientEmail = Array.isArray(emailResult.originalTo)
           ? emailResult.originalTo.join(", ")
