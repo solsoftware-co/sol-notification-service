@@ -85,6 +85,7 @@ npm run db:migrate         # Apply all pending migrations (safe to re-run; idemp
 npm run db:migrate:status  # Show applied vs pending migrations without making changes
 npm run db:seed            # Seed test client records
 npm run email:preview      # Send a mock email and open the HTML preview in the browser
+npm run release:dry        # Preview the next semantic-release version/changelog without publishing
 ```
 
 ## Code Style
@@ -142,4 +143,17 @@ Examples:
 - `docs/002-readme-commands`
 
 The `<spec-id>` matches the directory name under `specs/`. Never create a branch without one of the prefixes above.
+
+### Commit Messages & Releases
+
+Commit subject lines MUST follow Conventional Commits (`<type>(<scope>): <subject>`) — `semantic-release` (`.releaserc.json`) parses commit history on every merge to `main` to decide the version bump, so the type prefix is load-bearing, not cosmetic:
+
+| Type | Effect |
+|------|--------|
+| `fix:` | patch bump |
+| `feat:` | minor bump |
+| `feat!:` / `BREAKING CHANGE:` footer | major bump |
+| `chore:`, `docs:`, `refactor:`, `test:`, `ci:` | no release |
+
+On push to `main`, the `release` job in `.github/workflows/ci.yml` runs `semantic-release`, which bumps `package.json`, updates `CHANGELOG.md`, tags the commit, and publishes a GitHub Release. The package is `private`, so nothing is ever published to npm. Run `npm run release:dry` locally to preview the next version before merging.
 <!-- MANUAL ADDITIONS END -->
