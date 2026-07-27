@@ -58,8 +58,8 @@ jobs:
       - run: npm install --global vercel@latest
       - name: Sync SOL_API_URL / SOL_API_KEY into Preview
         run: |
-          echo "${{ secrets.SOL_API_URL_STAGING }}" | vercel env add SOL_API_URL preview --force
-          echo "${{ secrets.SOL_API_KEY_STAGING }}" | vercel env add SOL_API_KEY preview --force
+          vercel env add SOL_API_URL preview --value "${{ secrets.SOL_API_URL_STAGING }}" --yes --force
+          vercel env add SOL_API_KEY preview --value "${{ secrets.SOL_API_KEY_STAGING }}" --yes --force
 
   # ── Step 2: Wait for Vercel Preview deployment to be ready ────────────────
   wait-for-deployment:
