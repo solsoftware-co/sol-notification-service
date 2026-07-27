@@ -96,10 +96,10 @@ jobs:
       # edits. --force makes it safe to re-run on every push.
       - name: Sync staging environment variables
         run: |
-          vercel env add SOL_API_URL staging --value "${{ secrets.SOL_API_URL_STAGING }}" --yes --force
-          vercel env add SOL_API_KEY staging --value "${{ secrets.SOL_API_KEY_STAGING }}" --yes --force
-          vercel env add INNGEST_EVENT_KEY staging --value "${{ secrets.INNGEST_EVENT_KEY_STAGING }}" --yes --force
-          vercel env add INNGEST_SIGNING_KEY staging --value "${{ secrets.INNGEST_SIGNING_KEY_STAGING }}" --yes --force
+          vercel env add SOL_API_URL staging --value "${{ secrets.SOL_API_URL_STAGING }}" --yes --force --non-interactive < /dev/null
+          vercel env add SOL_API_KEY staging --value "${{ secrets.SOL_API_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
+          vercel env add INNGEST_EVENT_KEY staging --value "${{ secrets.INNGEST_EVENT_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
+          vercel env add INNGEST_SIGNING_KEY staging --value "${{ secrets.INNGEST_SIGNING_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
 
       - name: Deploy to staging
         id: deploy
@@ -154,8 +154,8 @@ jobs:
       # integration itself (see CLAUDE.md), not this workflow.
       - name: Sync production environment variables
         run: |
-          vercel env add SOL_API_URL production --value "${{ secrets.SOL_API_URL_PRODUCTION }}" --yes --force
-          vercel env add SOL_API_KEY production --value "${{ secrets.SOL_API_KEY_PRODUCTION }}" --yes --force
+          vercel env add SOL_API_URL production --value "${{ secrets.SOL_API_URL_PRODUCTION }}" --yes --force --non-interactive < /dev/null
+          vercel env add SOL_API_KEY production --value "${{ secrets.SOL_API_KEY_PRODUCTION }}" --yes --force --non-interactive < /dev/null
 
       - name: Deploy to production
         run: vercel deploy --prod --yes
