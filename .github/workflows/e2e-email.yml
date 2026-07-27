@@ -38,67 +38,54 @@ jobs:
               - 'src/inngest/functions/index.ts'
               - 'src/types/index.ts'
 
-  # ── Step 1b: Sync sol-api creds into Vercel's Preview environment ──────────
+  # ── Step 1b: Sync sol-api creds into Preview, then deploy ourselves ────────
   # GitHub Secrets are the source of truth; this pushes them into Vercel so
   # nobody has to hand-type values into the Vercel dashboard. Preview points
   # at sol-api's staging deployment — same credentials the persistent
   # "staging" custom environment uses post-merge.
-  # Note: Vercel's own automatic Preview build is triggered independently of
-  # this workflow, so there's a narrow race on a *brand new* PR if Vercel
-  # finishes building before this job finishes syncing. Values persist once
-  # set, so this only bites (rarely) on the very first run — pushing another
-  # commit to the PR picks up the already-synced values.
+  #
+  # We deploy explicitly here (rather than relying on Vercel's automatic
+  # git-triggered Preview build + polling for it) because that race is not
+  # rare: Vercel typically starts building within ~3s of the push, well
+  # before this job finishes installing the CLI and syncing env vars, so
+  # the automatic deployment reliably gets built with stale/missing values.
+  # Deploying ourselves, after the sync, guarantees correct ordering.
   sync-preview-env:
     runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: team_3BeW3i0ok6rNli9su37BjZ9n
       VERCEL_PROJECT_ID: prj_BRk7QsxbHKRUKmDvygDFQN6ijKfF
     steps:
+      - uses: actions/checkout@v4
       - run: npm install --global vercel@latest
       - name: Sync SOL_API_URL / SOL_API_KEY into Preview
         run: |
           vercel env add SOL_API_URL preview --value "${{ secrets.SOL_API_URL_STAGING }}" --yes --force --non-interactive < /dev/null
           vercel env add SOL_API_KEY preview --value "${{ secrets.SOL_API_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
+      - name: Deploy Preview build (post-sync)
+        id: deploy
+        run: echo "url=$(vercel deploy --yes --non-interactive < /dev/null)" >> "$GITHUB_OUTPUT"
 
-  # ── Step 2: Wait for Vercel Preview deployment to be ready ────────────────
+  # ── Step 2: Register the Inngest app with the freshly-deployed Preview build ──
   wait-for-deployment:
     needs: [detect-changes, sync-preview-env]
-    # Only wait if at least one email flow is affected
+    # Only run if at least one email flow is affected
     if: |
       needs.detect-changes.outputs.weekly-analytics == 'true' ||
       needs.detect-changes.outputs.form-notification == 'true' ||
       needs.detect-changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
     outputs:
-      url: ${{ steps.wait.outputs.url }}
+      url: ${{ needs.sync-preview-env.outputs.url }}
     steps:
-      - name: Wait for Vercel Preview deployment
-        id: wait
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          SHA="${{ github.event.pull_request.head.sha }}"
-          for i in $(seq 1 30); do
-            RESULT=$(curl -s "https://api.vercel.com/v6/deployments?meta-githubCommitSha=${SHA}&limit=5" \
-              -H "Authorization: Bearer ${VERCEL_TOKEN}")
-            URL=$(echo "$RESULT" | jq -r '.deployments[] | select(.state=="READY") | .url' | head -1)
-            if [ -n "$URL" ]; then
-              echo "url=https://${URL}" >> $GITHUB_OUTPUT
-              echo "Found deployment: https://${URL}"
-              exit 0
-            fi
-            echo "Waiting for deployment... (attempt $i/30)"
-            sleep 10
-          done
-          echo "Timed out waiting for Vercel deployment"
-          exit 1
-
       - name: Sync Inngest app with Preview deployment
         env:
           INNGEST_SIGNING_KEY_STAGING: ${{ secrets.INNGEST_SIGNING_KEY_STAGING }}
         run: |
-          PREVIEW_URL="${{ steps.wait.outputs.url }}"
+          PREVIEW_URL="${{ needs.sync-preview-env.outputs.url }}"
           echo "=== Step 1: PUT to app sync endpoint ==="
           curl -s -w "\nHTTP %{http_code}" -X PUT "${PREVIEW_URL}/api/inngest" \
             -H "Content-Type: application/json" || true
