@@ -3,7 +3,7 @@ import { serve } from "inngest/node";
 import { inngest } from "./inngest/client";
 import { functions } from "./inngest/functions/index";
 import { config } from "./lib/config";
-import { checkDbConnection } from "./lib/db";
+import { checkSolApiConnection } from "./lib/sol-api";
 import { log, flush } from "./utils/logger";
 
 const handler = serve({ client: inngest, functions });
@@ -29,5 +29,5 @@ server.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
   console.log(`Inngest serve handler ready at http://localhost:${PORT}/api/inngest`);
   log(`Config loaded: env=${config.env}, emailMode=${config.emailMode}`);
-  checkDbConnection();
+  checkSolApiConnection();
 });

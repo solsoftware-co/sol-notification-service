@@ -15,12 +15,13 @@ vi.mock("../../../../src/lib/config", () => ({
     testEmail: null,
     resendApiKey: null,
     resendFrom: "no-reply@test.local",
-    databaseUrl: "postgresql://mock",
+    solApiUrl: "https://sol-api-staging.solsoftware.workers.dev",
+    solApiKey: "test-key",
     ga4CredentialsJson: null,
   },
 }));
 
-vi.mock("../../../../src/lib/db", () => ({
+vi.mock("../../../../src/lib/sol-api", () => ({
   getClientById: mockGetClientById,
   writeNotificationLog: mockWriteNotificationLog,
 }));

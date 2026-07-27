@@ -11,7 +11,7 @@
 
 import { inngest } from "../client";
 import { config } from "../../lib/config";
-import { getClientById } from "../../lib/db";
+import { getClientById } from "../../lib/sol-api";
 import { sendEmail } from "../../lib/email";
 import { log, logError, setRunContext } from "../../utils/logger";
 import type { BaseEventPayload } from "../../types/index";

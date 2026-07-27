@@ -1,10 +1,11 @@
 // config.test.ts — config module unit tests
-// config.ts calls buildConfig() at module load, which throws if DATABASE_URL
-// is absent. Use vi.resetModules() + dynamic import() so each test gets a
-// fresh evaluation with the process.env values it sets.
+// config.ts calls buildConfig() at module load, which throws if SOL_API_URL
+// or SOL_API_KEY is absent. Use vi.resetModules() + dynamic import() so each
+// test gets a fresh evaluation with the process.env values it sets.
 
 const ENV_KEYS = [
-  "DATABASE_URL",
+  "SOL_API_URL",
+  "SOL_API_KEY",
   "VERCEL_ENV",
   "TEST_EMAIL",
   "RESEND_API_KEY",
@@ -21,8 +22,9 @@ describe("buildConfig", () => {
     ENV_KEYS.forEach((k) => delete process.env[k]);
   });
 
-  it("no VERCEL_ENV + DATABASE_URL → env=development, emailMode=mock", async () => {
-    process.env.DATABASE_URL = "postgresql://test";
+  it("no VERCEL_ENV + sol-api config → env=development, emailMode=mock", async () => {
+    process.env.SOL_API_URL = "https://sol-api-staging.solsoftware.workers.dev";
+    process.env.SOL_API_KEY = "test-key";
 
     const { config } = await import("../../../src/lib/config");
 
@@ -33,7 +35,8 @@ describe("buildConfig", () => {
   });
 
   it("VERCEL_ENV=preview + TEST_EMAIL → env=preview, emailMode=test", async () => {
-    process.env.DATABASE_URL = "postgresql://test";
+    process.env.SOL_API_URL = "https://sol-api-staging.solsoftware.workers.dev";
+    process.env.SOL_API_KEY = "test-key";
     process.env.VERCEL_ENV = "preview";
     process.env.TEST_EMAIL = "dev@test.local";
 
@@ -45,7 +48,8 @@ describe("buildConfig", () => {
   });
 
   it("VERCEL_ENV=production + RESEND_API_KEY → env=production, emailMode=live", async () => {
-    process.env.DATABASE_URL = "postgresql://test";
+    process.env.SOL_API_URL = "https://sol-api.solsoftware.workers.dev";
+    process.env.SOL_API_KEY = "test-key";
     process.env.VERCEL_ENV = "production";
     process.env.RESEND_API_KEY = "re_test_key";
 
@@ -56,9 +60,19 @@ describe("buildConfig", () => {
     expect(config.resendApiKey).toBe("re_test_key");
   });
 
-  it("throws when DATABASE_URL is absent", async () => {
+  it("throws when SOL_API_URL is absent", async () => {
+    process.env.SOL_API_KEY = "test-key";
+
     await expect(import("../../../src/lib/config")).rejects.toThrow(
-      /DATABASE_URL/
+      /SOL_API_URL/
+    );
+  });
+
+  it("throws when SOL_API_KEY is absent", async () => {
+    process.env.SOL_API_URL = "https://sol-api-staging.solsoftware.workers.dev";
+
+    await expect(import("../../../src/lib/config")).rejects.toThrow(
+      /SOL_API_KEY/
     );
   });
 });

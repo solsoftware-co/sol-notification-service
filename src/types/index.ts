@@ -20,7 +20,8 @@ export interface AppConfig {
   testEmail: string | null;
   resendApiKey: string | null;
   resendFrom: string;
-  databaseUrl: string;
+  solApiUrl: string;
+  solApiKey: string;
   logtailToken: string | null;
   mailtrapSmtpUser: string | null;
   mailtrapSmtpPass: string | null;

@@ -18,16 +18,11 @@ npm install
 
 # 2. Configure environment
 cp .env.local.example .env.local
-# Edit .env.local — minimum required: DATABASE_URL
+# Edit .env.local — minimum required: SOL_API_URL and SOL_API_KEY
+# (client + notification-log data lives behind sol-api, not a local database)
 # All other values have sensible defaults for local development
 
-# 3. Create database tables
-npm run db:setup
-
-# 4. Seed test clients
-npm run db:seed
-
-# 5. Start the dev environment
+# 3. Start the dev environment
 npm run dev
 ```
 
@@ -52,15 +47,6 @@ npm run dev
 | `npm run type-check` | Type-check all source files without emitting output |
 | `npm test` | Run the full unit test suite (Vitest) |
 
-### Database
-
-| Command | Description |
-|---------|-------------|
-| `npm run db:setup` | Create all required tables (idempotent — safe to re-run) |
-| `npm run db:seed` | Insert test client records (skips existing rows) |
-
-> Both database commands read `DATABASE_URL` from `.env.local`. Run `db:setup` before `db:seed` on a fresh database.
-
 ### Email
 
 | Command | Description |
@@ -73,7 +59,8 @@ Copy `.env.local.example` to `.env.local` and fill in the values below.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `DATABASE_URL` | ✅ Always | — | Neon or local PostgreSQL connection string |
+| `SOL_API_URL` | ✅ Always | — | Base URL for sol-api (client + notification-log data) |
+| `SOL_API_KEY` | ✅ Always | — | sol-api `X-API-Key` credential for this environment |
 | `VERCEL_ENV` | — | `development` | Set to `preview` or `production` on Vercel. Absent = local dev. |
 | `EMAIL_MODE` | — | Auto-derived | Override email routing: `mock`, `test`, or `live` |
 | `RESEND_API_KEY` | Production | — | Resend API key. Required when `EMAIL_MODE=live`. |
@@ -168,7 +155,7 @@ src/
 │   └── index.ts                    # All shared TypeScript types and event payload interfaces
 ├── lib/
 │   ├── config.ts                   # Environment config singleton (single source of truth)
-│   ├── db.ts                       # Neon Pool singleton + getClientById() + getAllActiveClients()
+│   ├── sol-api.ts                  # sol-api HTTP client — getClientById(), getAllActiveClients(), writeNotificationLog()
 │   ├── analytics.ts                # GA4 Data API wrapper — getAnalyticsReport(), mock/live routing
 │   ├── email.ts                    # Email abstraction (mock/test/live routing)
 │   └── charts.ts                   # QuickChart URL builder — generateBarChart(), generateAreaChart()
@@ -189,8 +176,6 @@ src/
         └── weekly-analytics-report.ts
 
 scripts/
-├── setup-db.ts                     # Idempotent table creation (npm run db:setup)
-├── seed-data.ts                    # Insert test clients (npm run db:seed)
 └── test-email-preview.ts           # Trigger mock email preview (npm run email:preview)
 
 specs/                              # Feature specs, plans, research — one directory per feature

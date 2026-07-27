@@ -35,6 +35,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x` — no new packages required (022-client-timezone)
 - Neon PostgreSQL — V004 migration adds `timezone TEXT NOT NULL DEFAULT 'America/Chicago'` to `clients` (022-client-timezone)
 - TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `pino ^9.x`, `@logtail/pino ^3.x` — all existing; zero new packages (023-improve-function-logging)
+- TypeScript 5.x / Node.js 20+ + Node.js native `fetch` only — no new packages; removes `@neondatabase/serverless`, `ws`, `pg` (027-sol-api-client-migration)
+- No direct database access — client + notification-log data now lives behind sol-api (Cloudflare Workers + Neon), reached over HTTP with `X-API-Key` auth. `SOL_API_URL` / `SOL_API_KEY` replace `DATABASE_URL`. Schema/migrations are fully owned by sol-api's Drizzle pipeline (027-sol-api-client-migration)
 
 ## Project Structure
 
@@ -45,7 +47,7 @@ src/
 │   └── index.ts                    # All shared TypeScript types and event payload interfaces
 ├── lib/
 │   ├── config.ts                   # Environment config singleton (single source of truth)
-│   ├── db.ts                       # Neon Pool singleton + getClientById() + getAllActiveClients()
+│   ├── sol-api.ts                  # sol-api HTTP client — getClientById(), getAllActiveClients(), writeNotificationLog(), checkSolApiConnection()
 │   ├── analytics.ts                # GA4 Data API wrapper — getAnalyticsReport(), mock/live routing
 │   └── email.ts                    # Email abstraction (mock/test/live routing)
 ├── utils/
@@ -62,13 +64,7 @@ src/
         ├── weekly-analytics-scheduler.ts  # Cron (Tue 09:00 UTC) + manual trigger; fans out per-client events
         └── weekly-analytics-report.ts     # Per-client worker: fetch GA4 data, build + send email
 
-db/
-└── migrations/                     # Versioned SQL migration files (V###__description.sql)
-
 scripts/
-├── migrate.ts                      # Migration runner — apply + status modes (npm run db:migrate)
-├── setup-db.ts                     # DEPRECATED — replaced by db:migrate
-├── seed-data.ts                    # Insert test clients (npm run db:seed)
 └── test-email-preview.ts           # Trigger mock email preview (npm run email:preview)
 
 specs/                              # Feature specs, plans, research (per feature)
@@ -81,9 +77,6 @@ specs/                              # Feature specs, plans, research (per featur
 npm run dev                # Start app server + Inngest Dev Server concurrently
 npm run build              # Compile TypeScript to dist/
 npm run type-check         # Type-check without emitting
-npm run db:migrate         # Apply all pending migrations (safe to re-run; idempotent)
-npm run db:migrate:status  # Show applied vs pending migrations without making changes
-npm run db:seed            # Seed test client records
 npm run email:preview      # Send a mock email and open the HTML preview in the browser
 npm run release:dry        # Preview the next semantic-release version/changelog without publishing
 ```
@@ -96,8 +89,7 @@ npm run release:dry        # Preview the next semantic-release version/changelog
 - Named steps (descriptive human-readable strings) are required in all `step.run()` calls
 - Environment config read exclusively via `src/lib/config.ts`
 - All email sends route through `src/lib/email.ts` — never call Resend SDK directly
-- All DB queries route through `src/lib/db.ts` — never call Neon/pg directly
-- `@neondatabase/serverless` Pool requires `ws` + `neonConfig.webSocketConstructor = ws` on Node.js 20 (no native WebSocket until Node 22) — already configured in `src/lib/db.ts`
+- All client + notification-log data goes through `src/lib/sol-api.ts` — never query a database directly. This service holds no DB connection; `src/lib/sol-api.ts` is a `fetch`-based sol-api client (`X-API-Key` auth via `SOL_API_URL`/`SOL_API_KEY`). Schema/migrations live entirely in the sol-api repo.
 - See `.specify/memory/constitution.md` for full architectural rules
 
 ## E2E Email Testing (feature 010)
@@ -111,6 +103,7 @@ When adding a new Inngest email workflow, register it in the e2e test suite — 
 Run locally with: `PREVIEW_URL=<url> INNGEST_EVENT_KEY_STAGING=<key> ... npm run test:e2e`
 
 ## Recent Changes
+- 027-sol-api-client-migration: Removed all direct database access (`@neondatabase/serverless`, `ws`, `pg`, `db/migrations/`, `scripts/migrate.ts`, `scripts/setup-db.ts`, `scripts/seed-data.ts`). `src/lib/db.ts` renamed to `src/lib/sol-api.ts` — a `fetch`-based sol-api HTTP client. `DATABASE_URL` replaced by `SOL_API_URL`/`SOL_API_KEY`. Removed the `testOnly` email-filter safety net from the analytics schedulers — non-prod environments now hit sol-api's isolated staging deployment instead, so environment separation is real rather than filtered-by-convention.
 - 023-improve-function-logging: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `pino ^9.x`, `@logtail/pino ^3.x` — all existing; zero new packages
 - 022-client-timezone: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x` — no new packages required
 - 021-sheets-range-anchor: `GoogleSheetsDestination` gains optional `tableAnchor?: string` field; `buildRange()` helper extracted in `src/lib/sheets.ts` — no new packages, no DB changes

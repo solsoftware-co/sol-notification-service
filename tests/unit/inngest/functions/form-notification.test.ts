@@ -15,11 +15,12 @@ vi.mock("../../../../src/lib/config", () => ({
     testEmail: null,
     resendApiKey: null,
     resendFrom: "no-reply@test.local",
-    databaseUrl: "postgresql://mock",
+    solApiUrl: "https://sol-api-staging.solsoftware.workers.dev",
+    solApiKey: "test-key",
   },
 }));
 
-vi.mock("../../../../src/lib/db", () => ({
+vi.mock("../../../../src/lib/sol-api", () => ({
   getClientById: vi.fn(),
   writeNotificationLog: mockWriteNotificationLog,
 }));
@@ -45,7 +46,7 @@ vi.mock("../../../../src/utils/logger", () => ({
 
 // Imports after mocks
 import { sendFormNotification } from "../../../../src/inngest/functions/form-notification";
-import { getClientById } from "../../../../src/lib/db";
+import { getClientById } from "../../../../src/lib/sol-api";
 import { sendEmail } from "../../../../src/lib/email";
 import { resolveRecipients } from "../../../../src/lib/notifications";
 import { config } from "../../../../src/lib/config";

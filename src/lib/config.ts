@@ -23,9 +23,14 @@ function deriveEmailMode(env: AppEnv): EmailMode {
 }
 
 function buildConfig(): AppConfig {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL environment variable is not set");
+  const solApiUrl = process.env.SOL_API_URL;
+  if (!solApiUrl) {
+    throw new Error("SOL_API_URL environment variable is not set");
+  }
+
+  const solApiKey = process.env.SOL_API_KEY;
+  if (!solApiKey) {
+    throw new Error("SOL_API_KEY environment variable is not set");
   }
 
   const env = deriveEnv();
@@ -58,7 +63,7 @@ function buildConfig(): AppConfig {
 
   const logtailToken = process.env.LOGTAIL_SOURCE_TOKEN ?? null;
 
-  return { env, emailMode, testEmail, resendApiKey, resendFrom, databaseUrl, logtailToken, mailtrapSmtpUser, mailtrapSmtpPass };
+  return { env, emailMode, testEmail, resendApiKey, resendFrom, solApiUrl, solApiKey, logtailToken, mailtrapSmtpUser, mailtrapSmtpPass };
 }
 
 export const config: AppConfig = buildConfig();
