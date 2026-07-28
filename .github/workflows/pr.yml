@@ -1,4 +1,4 @@
-name: E2E Email Tests
+name: PR
 
 on:
   pull_request:
@@ -11,7 +11,31 @@ permissions:
   statuses: read
 
 jobs:
-  # ── Step 1: Detect which email flows were affected by this PR ─────────────
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run type-check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm test
+
+  # ── Detect which email flows were affected by this PR ──────────────────────
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -38,7 +62,7 @@ jobs:
               - 'src/inngest/functions/index.ts'
               - 'src/types/index.ts'
 
-  # ── Step 1b: Sync sol-api creds into Preview, then deploy ourselves ────────
+  # ── Sync sol-api creds into Preview, then deploy ourselves ─────────────────
   # GitHub Secrets are the source of truth; this pushes them into Vercel so
   # nobody has to hand-type values into the Vercel dashboard. Preview points
   # at sol-api's staging deployment — same credentials the persistent
@@ -71,7 +95,7 @@ jobs:
           DEPLOY_URL=$(vercel deploy --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
           echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
-  # ── Step 2: Register the Inngest app with the freshly-deployed Preview build ──
+  # ── Register the Inngest app with the freshly-deployed Preview build ───────
   wait-for-deployment:
     needs: [detect-changes, sync-preview-env]
     # Only run if at least one email flow is affected
@@ -104,7 +128,7 @@ jobs:
           echo "Waiting 20s for sync to propagate..."
           sleep 20
 
-  # ── Step 3a: Run weekly analytics e2e tests (if affected) ─────────────────
+  # ── Run weekly analytics e2e tests (if affected) ───────────────────────────
   e2e-weekly-analytics:
     needs: [detect-changes, wait-for-deployment]
     if: |
@@ -131,7 +155,7 @@ jobs:
           MAILTRAP_ACCOUNT_ID: ${{ secrets.MAILTRAP_ACCOUNT_ID }}
           MAILTRAP_INBOX_ID: ${{ secrets.MAILTRAP_INBOX_ID }}
 
-  # ── Step 3b: Run form notification e2e tests (if affected) ────────────────
+  # ── Run form notification e2e tests (if affected) ──────────────────────────
   e2e-form-notification:
     needs: [detect-changes, wait-for-deployment]
     if: |
@@ -158,7 +182,7 @@ jobs:
           MAILTRAP_ACCOUNT_ID: ${{ secrets.MAILTRAP_ACCOUNT_ID }}
           MAILTRAP_INBOX_ID: ${{ secrets.MAILTRAP_INBOX_ID }}
 
-  # ── Step 4: Gate — the ONLY required status check on main ─────────────────
+  # ── Gate — the ONLY required status check on main ──────────────────────────
   # Succeeds if all upstream jobs passed OR were skipped (no relevant files changed).
   # Set ONLY this job as required in branch protection settings.
   ci-gate:

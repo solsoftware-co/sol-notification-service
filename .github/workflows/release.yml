@@ -1,9 +1,7 @@
-name: CI
+name: Release
 
 on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
 
 jobs:
@@ -42,7 +40,6 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [type-check, test]
     permissions:
       contents: write
@@ -74,7 +71,6 @@ jobs:
   deploy-staging:
     name: Deploy Staging
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [type-check, test]
     outputs:
       url: ${{ steps.deploy.outputs.url }}
