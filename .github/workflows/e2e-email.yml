@@ -67,7 +67,9 @@ jobs:
           vercel env add SOL_API_KEY preview --value "${{ secrets.SOL_API_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
       - name: Deploy Preview build (post-sync)
         id: deploy
-        run: echo "url=$(vercel deploy --yes --non-interactive < /dev/null)" >> "$GITHUB_OUTPUT"
+        run: |
+          DEPLOY_URL=$(vercel deploy --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
   # ── Step 2: Register the Inngest app with the freshly-deployed Preview build ──
   wait-for-deployment:

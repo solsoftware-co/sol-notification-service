@@ -103,7 +103,9 @@ jobs:
 
       - name: Deploy to staging
         id: deploy
-        run: echo "url=$(vercel deploy --target=staging --yes)" >> "$GITHUB_OUTPUT"
+        run: |
+          DEPLOY_URL=$(vercel deploy --target=staging --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
       - name: Sync Inngest app with staging deployment
         env:
