@@ -80,8 +80,8 @@ jobs:
       url: ${{ steps.deploy.outputs.url }}
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: team_3BeW3i0ok6rNli9su37BjZ9n
-      VERCEL_PROJECT_ID: prj_BRk7QsxbHKRUKmDvygDFQN6ijKfF
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
       - run: npm install --global vercel@latest
