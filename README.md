@@ -65,7 +65,6 @@ Copy `.env.local.example` to `.env.local` and fill in the values below.
 | `EMAIL_MODE` | — | Auto-derived | Override email routing: `mock`, `test`, or `live` |
 | `RESEND_API_KEY` | Production | — | Resend API key. Required when `EMAIL_MODE=live`. |
 | `RESEND_FROM` | — | Example address | Verified sender address for Resend |
-| `TEST_EMAIL` | Preview | — | Redirect target when `EMAIL_MODE=test` |
 | `GA4_SERVICE_ACCOUNT_JSON` | Production | — | GA4 service account JSON string. Returns mock data when absent. |
 | `LOGTAIL_SOURCE_TOKEN` | Production + Preview | — | Better Stack source token. Absent in dev — logs go to stdout. |
 
@@ -74,7 +73,7 @@ Copy `.env.local.example` to `.env.local` and fill in the values below.
 | Environment | Default mode | Behaviour |
 |---|---|---|
 | `development` | `mock` | Logs to console + writes `.email-preview/last.html`. No real sends. |
-| `preview` | `test` | Redirects all emails to `TEST_EMAIL` with a `[TEST: <recipient>]` subject prefix. |
+| `preview` | `test` | Real Resend send to the resolved recipient, with a `[TEST: <recipient>]` subject prefix. |
 | `production` | `live` | Delivers to real client email addresses. |
 
 ## Inngest Functions

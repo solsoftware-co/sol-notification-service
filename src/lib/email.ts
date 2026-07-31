@@ -47,7 +47,6 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
     return {
       mode,
       originalTo: request.to,
-      actualTo: request.to,
       subject: request.subject,
       outcome: "logged",
     };
@@ -80,14 +79,11 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
     return {
       mode,
       originalTo: request.to,
-      actualTo: request.to,
       subject,
       outcome: "sent",
     };
   }
 
-  const actualTo =
-    mode === "test" ? config.testEmail! : request.to;
   const subject =
     mode === "test"
       ? `[TEST: ${toLabel}] ${request.subject}`
@@ -106,7 +102,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
 
   const { data, error } = await resend.emails.send({
     from,
-    to: actualTo,
+    to: request.to,
     subject,
     html: request.html,
     ...(attachments ? { attachments } : {}),
@@ -118,16 +114,11 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
     throw new Error(`Resend error [${error.name}] ${tag}: ${error.message}`);
   }
 
-  if (mode === "test") {
-    log(`Test email redirected to ${actualTo} (original: ${toLabel}) — subject: ${subject}`);
-  } else {
-    log(`Email sent to ${toLabel} — Resend ID: ${data!.id}`);
-  }
+  log(`Email sent to ${toLabel} — Resend ID: ${data!.id}`);
 
   return {
     mode,
     originalTo: request.to,
-    actualTo,
     subject,
     outcome: "sent",
     resendId: data!.id,

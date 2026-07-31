@@ -17,7 +17,6 @@ export type EmailMode = "mock" | "test" | "live" | "mailtrap";
 export interface AppConfig {
   env: AppEnv;
   emailMode: EmailMode;
-  testEmail: string | null;
   resendApiKey: string | null;
   resendFrom: string;
   solApiUrl: string;
@@ -176,7 +175,6 @@ export interface EmailRequest {
 export interface EmailResult {
   mode: EmailMode;
   originalTo: string | string[];
-  actualTo: string | string[];
   subject: string;
   outcome: "sent" | "logged";
   resendId?: string;

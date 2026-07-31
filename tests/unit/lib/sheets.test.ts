@@ -13,7 +13,6 @@ vi.mock("../../../src/lib/config", () => ({
   config: {
     env: "development",
     emailMode: "mock",
-    testEmail: null,
     resendApiKey: null,
     resendFrom: "no-reply@test.local",
     databaseUrl: "postgresql://mock",

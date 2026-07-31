@@ -7,7 +7,6 @@ const ENV_KEYS = [
   "SOL_API_URL",
   "SOL_API_KEY",
   "VERCEL_ENV",
-  "TEST_EMAIL",
   "RESEND_API_KEY",
   "EMAIL_MODE",
 ] as const;
@@ -30,21 +29,18 @@ describe("buildConfig", () => {
 
     expect(config.env).toBe("development");
     expect(config.emailMode).toBe("mock");
-    expect(config.testEmail).toBeNull();
     expect(config.resendApiKey).toBeNull();
   });
 
-  it("VERCEL_ENV=preview + TEST_EMAIL → env=preview, emailMode=test", async () => {
+  it("VERCEL_ENV=preview → env=preview, emailMode=test", async () => {
     process.env.SOL_API_URL = "https://sol-api-staging.solsoftware.workers.dev";
     process.env.SOL_API_KEY = "test-key";
     process.env.VERCEL_ENV = "preview";
-    process.env.TEST_EMAIL = "dev@test.local";
 
     const { config } = await import("../../../src/lib/config");
 
     expect(config.env).toBe("preview");
     expect(config.emailMode).toBe("test");
-    expect(config.testEmail).toBe("dev@test.local");
   });
 
   it("VERCEL_ENV=production + RESEND_API_KEY → env=production, emailMode=live", async () => {

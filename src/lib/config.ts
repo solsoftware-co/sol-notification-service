@@ -36,7 +36,6 @@ function buildConfig(): AppConfig {
   const env = deriveEnv();
   const emailMode = deriveEmailMode(env);
 
-  const testEmail = process.env.TEST_EMAIL ?? null;
   const resendApiKey = process.env.RESEND_API_KEY ?? null;
   const resendFrom =
     process.env.RESEND_FROM ?? "Notifications <notifications@example.com>";
@@ -49,12 +48,6 @@ function buildConfig(): AppConfig {
     );
   }
 
-  if (emailMode === "test" && !testEmail) {
-    throw new Error(
-      "EMAIL_MODE=test requires TEST_EMAIL environment variable to be set"
-    );
-  }
-
   if (emailMode === "mailtrap" && (!mailtrapSmtpUser || !mailtrapSmtpPass)) {
     throw new Error(
       "EMAIL_MODE=mailtrap requires MAILTRAP_SMTP_USER and MAILTRAP_SMTP_PASS environment variables to be set"
@@ -63,7 +56,7 @@ function buildConfig(): AppConfig {
 
   const logtailToken = process.env.LOGTAIL_SOURCE_TOKEN ?? null;
 
-  return { env, emailMode, testEmail, resendApiKey, resendFrom, solApiUrl, solApiKey, logtailToken, mailtrapSmtpUser, mailtrapSmtpPass };
+  return { env, emailMode, resendApiKey, resendFrom, solApiUrl, solApiKey, logtailToken, mailtrapSmtpUser, mailtrapSmtpPass };
 }
 
 export const config: AppConfig = buildConfig();

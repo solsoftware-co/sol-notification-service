@@ -5,7 +5,6 @@ vi.mock("../../../../src/lib/config", () => ({
   config: {
     env: "production",
     emailMode: "live",
-    testEmail: null,
     resendApiKey: "re_test",
     resendFrom: "no-reply@test.local",
     solApiUrl: "https://sol-api-staging.solsoftware.workers.dev",

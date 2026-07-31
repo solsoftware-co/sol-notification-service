@@ -52,8 +52,9 @@ on client identifiers, URLs, or other non-environment signals.
 
 **Non-negotiable rules:**
 - Development MUST use `EMAIL_MODE=mock` (console.log only; zero real emails sent)
-- Preview MUST use `EMAIL_MODE=test` (redirect all emails to `TEST_EMAIL` address, with
-  an `[TEST: <original_recipient>]` subject prefix)
+- Preview MUST use `EMAIL_MODE=test` (real Resend send to the resolved recipient, with
+  an `[TEST: <original_recipient>]` subject prefix — no recipient override; use the
+  event payload's `recipients` field to control who receives a test send)
 - Production MUST use `EMAIL_MODE=live` (deliver to real client addresses)
 - Non-production scheduled workflows MUST apply a safety rate limit (e.g., `limit: 1` per
   hour) and MUST filter to test clients only (clients whose email contains `test`)
@@ -61,9 +62,12 @@ on client identifiers, URLs, or other non-environment signals.
   across environments
 - Every environment MUST be distinguishable in logs via `config.env`
 
-**Rationale:** Prevents accidental real email sends during development or staging. Preview
-deployments must be testable safely without impacting production data or real clients.
-This was an explicit architectural decision in the transition away from GCP.
+**Rationale:** Prevents any real email send during development. Preview deployments are
+testable end-to-end against Resend without a hardcoded recipient override — the `[TEST: ...]`
+subject prefix is the safety signal, and each event payload's own `recipients` field is the
+explicit, debuggable way to control who a preview send actually reaches. This was an explicit
+architectural decision in the transition away from GCP, revisited once staging environments
+and payload-level recipient control were both in place.
 
 ### III. Multi-Tenant by Design
 
@@ -252,4 +256,4 @@ gates in `plan-template.md` before merge. Violations of Principle VI (unapproved
 infrastructure) MUST be justified in the plan's Complexity Tracking table with explicit
 rationale for why no simpler approach exists.
 
-**Version**: 1.2.0 | **Ratified**: 2026-02-13 | **Last Amended**: 2026-04-08
+**Version**: 1.3.0 | **Ratified**: 2026-02-13 | **Last Amended**: 2026-07-31

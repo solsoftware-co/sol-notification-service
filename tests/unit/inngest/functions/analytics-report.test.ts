@@ -12,7 +12,6 @@ vi.mock("../../../../src/lib/config", () => ({
   config: {
     env: "development",
     emailMode: "mock",
-    testEmail: null,
     resendApiKey: null,
     resendFrom: "no-reply@test.local",
     solApiUrl: "https://sol-api-staging.solsoftware.workers.dev",
@@ -107,7 +106,6 @@ const mockReport: AnalyticsReport = {
 const mockEmailResult: EmailResult = {
   mode: "mock",
   originalTo: ["client@example.com"],
-  actualTo: ["client@example.com"],
   subject: "Your analytics report \u2014 Feb 16 \u2013 Feb 22, 2026",
   outcome: "logged",
 };
@@ -115,7 +113,6 @@ const mockEmailResult: EmailResult = {
 const mockLiveEmailResult: EmailResult = {
   mode: "live",
   originalTo: ["client@example.com"],
-  actualTo: ["client@example.com"],
   subject: "Your analytics report \u2014 Feb 16 \u2013 Feb 22, 2026",
   outcome: "sent",
   resendId: "resend-abc123",
