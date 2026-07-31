@@ -1,3 +1,21 @@
+# [1.1.0](https://github.com/solsoftware-co/sol-notification-service/compare/v1.0.0...v1.1.0) (2026-07-31)
+
+
+### Bug Fixes
+
+* **027:** deploy Preview ourselves instead of racing Vercel's auto-deploy ([0078ec3](https://github.com/solsoftware-co/sol-notification-service/commit/0078ec3d5d071419421eea2439d5c16025c9e9dc))
+* **027:** extract deploy URL via grep instead of raw stdout capture ([d5d81b5](https://github.com/solsoftware-co/sol-notification-service/commit/d5d81b5ebd576f8eebb9acb3092c0e8004fa4680))
+* **027:** force non-interactive mode for vercel env add in CI ([d6392e8](https://github.com/solsoftware-co/sol-notification-service/commit/d6392e87dc36f18283aac5224efb1134d8e21d12))
+* **027:** serve local dev health check on /api/health to match Vercel deployment ([3274149](https://github.com/solsoftware-co/sol-notification-service/commit/3274149706eb33f24f893fb5edbc5372e44a0228))
+* **027:** use --value/--yes for vercel env add instead of piped stdin ([a545d74](https://github.com/solsoftware-co/sol-notification-service/commit/a545d74ae2c041a5eddd4b058a912a3cd3a3383a))
+
+
+### Features
+
+* **027:** migrate client/notification-log access to sol-api HTTP client ([b0a00c2](https://github.com/solsoftware-co/sol-notification-service/commit/b0a00c28217f25befcdd81abd1d5501c9dece8d1))
+* **027:** stop redirecting EMAIL_MODE=test sends, rely on payload recipients ([5f100c4](https://github.com/solsoftware-co/sol-notification-service/commit/5f100c4c7ede6a31de0e50cb53b9d94cd745fc56))
+* **027:** support payload-level recipient override in weekly analytics report ([631af86](https://github.com/solsoftware-co/sol-notification-service/commit/631af867c38290181693d697136e3cf4618188da))
+
 # 1.0.0 (2026-07-22)
 
 
