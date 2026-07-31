@@ -188,7 +188,7 @@ export const sendAnalyticsReport = inngest.createFunction(
 
     const result = await step.run("send-email", async () => {
       setRunContext({ runId, clientId });
-      const { recipients } = resolveRecipients(client, "analytics_report");
+      const { recipients } = resolveRecipients(client, "analytics_report", data.recipients);
       const rendered = await renderAnalyticsReportEmail(report, client, resolvedPeriod);
       const toLabel = Array.isArray(recipients) ? recipients.join(", ") : recipients;
       log(`Sending analytics report email to ${toLabel}`);

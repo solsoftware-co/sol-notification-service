@@ -68,7 +68,7 @@ function filterAddresses(
 export function resolveRecipients(
   client: ClientRow,
   workflowKey: string,
-  payloadRecipients?: string[] | null
+  payloadRecipients: string[] | undefined
 ): RecipientResolutionResult {
   // Tier 1: payload-level override
   if (Array.isArray(payloadRecipients) && payloadRecipients.length > 0) {

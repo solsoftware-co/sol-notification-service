@@ -41,37 +41,37 @@ beforeEach(() => {
 describe("resolveRecipients — tier 3: client.email fallback", () => {
   it("returns client.email with source=client_email when settings has no notifications key", () => {
     const client = makeClient({ settings: {} });
-    const result = resolveRecipients(client, "form_submitted");
+    const result = resolveRecipients(client, "form_submitted", undefined);
     expect(result).toEqual({ recipients: ["owner@test.com"], source: "client_email" });
   });
 
   it("returns client.email when notifications key is present but workflow key is absent", () => {
     const client = makeClient({ settings: { notifications: { analytics_report: ["a@b.com"] } } });
-    const result = resolveRecipients(client, "form_submitted");
+    const result = resolveRecipients(client, "form_submitted", undefined);
     expect(result).toEqual({ recipients: ["owner@test.com"], source: "client_email" });
   });
 
   it("returns client.email when the workflow key is an empty array", () => {
     const client = makeClient({ settings: { notifications: { form_submitted: [] } } });
-    const result = resolveRecipients(client, "form_submitted");
+    const result = resolveRecipients(client, "form_submitted", undefined);
     expect(result).toEqual({ recipients: ["owner@test.com"], source: "client_email" });
   });
 
   it("returns client.email when notifications value is not an object", () => {
     const client = makeClient({ settings: { notifications: "invalid" } });
-    const result = resolveRecipients(client, "form_submitted");
+    const result = resolveRecipients(client, "form_submitted", undefined);
     expect(result).toEqual({ recipients: ["owner@test.com"], source: "client_email" });
   });
 
   it("returns client.email when the workflow key value is not an array", () => {
     const client = makeClient({ settings: { notifications: { form_submitted: "not-an-array" } } });
-    const result = resolveRecipients(client, "form_submitted");
+    const result = resolveRecipients(client, "form_submitted", undefined);
     expect(result).toEqual({ recipients: ["owner@test.com"], source: "client_email" });
   });
 
-  it("returns client.email with source=client_email when payloadRecipients is null", () => {
+  it("returns client.email with source=client_email when payloadRecipients is undefined", () => {
     const client = makeClient({ settings: {} });
-    const result = resolveRecipients(client, "form_submitted", null);
+    const result = resolveRecipients(client, "form_submitted", undefined);
     expect(result).toEqual({ recipients: ["owner@test.com"], source: "client_email" });
   });
 
@@ -90,7 +90,7 @@ describe("resolveRecipients — tier 2: settings list", () => {
     const client = makeClient({
       settings: { notifications: { form_submitted: ["sales@example.com", "owner@example.com"] } },
     });
-    const result = resolveRecipients(client, "form_submitted");
+    const result = resolveRecipients(client, "form_submitted", undefined);
     expect(result).toEqual({
       recipients: ["sales@example.com", "owner@example.com"],
       source: "settings",
@@ -101,7 +101,7 @@ describe("resolveRecipients — tier 2: settings list", () => {
     const client = makeClient({
       settings: { notifications: { analytics_report: ["marketing@example.com"] } },
     });
-    const result = resolveRecipients(client, "analytics_report");
+    const result = resolveRecipients(client, "analytics_report", undefined);
     expect(result).toEqual({ recipients: ["marketing@example.com"], source: "settings" });
   });
 
@@ -114,11 +114,11 @@ describe("resolveRecipients — tier 2: settings list", () => {
         },
       },
     });
-    expect(resolveRecipients(client, "form_submitted")).toEqual({
+    expect(resolveRecipients(client, "form_submitted", undefined)).toEqual({
       recipients: ["sales@example.com"],
       source: "settings",
     });
-    expect(resolveRecipients(client, "analytics_report")).toEqual({
+    expect(resolveRecipients(client, "analytics_report", undefined)).toEqual({
       recipients: ["marketing@example.com"],
       source: "settings",
     });
@@ -128,7 +128,7 @@ describe("resolveRecipients — tier 2: settings list", () => {
     const client = makeClient({
       settings: { notifications: { form_submitted: ["valid@example.com", "not-an-email", ""] } },
     });
-    const result = resolveRecipients(client, "form_submitted");
+    const result = resolveRecipients(client, "form_submitted", undefined);
     expect(result).toEqual({ recipients: ["valid@example.com"], source: "settings" });
     expect(mockLogError).toHaveBeenCalledTimes(2);
   });
@@ -137,7 +137,7 @@ describe("resolveRecipients — tier 2: settings list", () => {
     const client = makeClient({
       settings: { notifications: { form_submitted: ["no-at-sign", "", 42] } },
     });
-    const result = resolveRecipients(client, "form_submitted");
+    const result = resolveRecipients(client, "form_submitted", undefined);
     expect(result).toEqual({ recipients: ["owner@test.com"], source: "client_email" });
     expect(mockLogError).toHaveBeenCalledTimes(3);
   });
@@ -146,7 +146,7 @@ describe("resolveRecipients — tier 2: settings list", () => {
     const client = makeClient({
       settings: { notifications: { form_submitted: ["Alice@Example.com", "alice@example.com", "BOB@example.com"] } },
     });
-    const result = resolveRecipients(client, "form_submitted");
+    const result = resolveRecipients(client, "form_submitted", undefined);
     expect(result).toEqual({
       recipients: ["Alice@Example.com", "BOB@example.com"],
       source: "settings",
@@ -229,25 +229,5 @@ describe("resolveRecipients — tier 1: payload recipients", () => {
       expect.any(Error),
       expect.objectContaining({ clientId: "client-test", tier: "payload" })
     );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Backwards compatibility: omitting the third argument
-// ---------------------------------------------------------------------------
-describe("resolveRecipients — backwards compatibility", () => {
-  it("behaves identically to the two-tier resolution when payloadRecipients is omitted", () => {
-    const client = makeClient({
-      settings: { notifications: { form_submitted: ["team@example.com"] } },
-    });
-    // Called without third argument — should use settings tier
-    const result = resolveRecipients(client, "form_submitted");
-    expect(result).toEqual({ recipients: ["team@example.com"], source: "settings" });
-  });
-
-  it("returns client.email with source=client_email when no settings and no payload", () => {
-    const client = makeClient({ settings: {} });
-    const result = resolveRecipients(client, "form_submitted");
-    expect(result).toEqual({ recipients: ["owner@test.com"], source: "client_email" });
   });
 });

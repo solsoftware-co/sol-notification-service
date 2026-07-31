@@ -102,6 +102,13 @@ export interface AnalyticsReportRequestedPayload extends BaseEventPayload {
    * manual triggers send immediately.
    */
   enforceDeliveryWindow?: boolean;
+  /**
+   * Optional per-invocation recipient override.
+   * When present and valid, these addresses receive the report
+   * instead of the stored settings or client.email.
+   * Invalid entries are discarded; empty array treated as absent.
+   */
+  recipients?: string[];
 }
 
 export interface ClientRow {
