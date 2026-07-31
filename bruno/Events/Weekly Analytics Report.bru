@@ -1,0 +1,31 @@
+meta {
+  name: Weekly Analytics Report
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{eventEndpoint}}
+  body: json
+  auth: none
+}
+
+script:pre-request {
+  const inngestEnv = bru.getEnvVar("inngestEnv");
+  if (inngestEnv) {
+    req.setHeader("x-inngest-env", inngestEnv);
+  }
+  bru.setVar("scheduledAt", new Date().toISOString());
+}
+
+body:json {
+  {
+    "name": "analytics/report.requested",
+    "data": {
+      "clientId": "client-acme",
+      "reportPeriod": { "preset": "last_week" },
+      "scheduledAt": "{{scheduledAt}}",
+      "recipients": ["{{recipientEmail}}"]
+    }
+  }
+}
