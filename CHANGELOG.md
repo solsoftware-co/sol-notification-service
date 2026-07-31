@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.0...v1.1.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* **027:** send x-inngest-env header when running e2e suite against staging ([8df024f](https://github.com/solsoftware-co/sol-notification-service/commit/8df024f8b4475f374950f446a6c87cf057401091))
+
 # [1.1.0](https://github.com/solsoftware-co/sol-notification-service/compare/v1.0.0...v1.1.0) (2026-07-31)
 
 
