@@ -31,7 +31,7 @@ npm run dev
 | Service | URL |
 |---------|-----|
 | App server | http://localhost:3000 |
-| Health check | http://localhost:3000/health |
+| Health check | http://localhost:3000/api/health |
 | Inngest Dev UI | http://localhost:8288 |
 | Inngest serve handler | http://localhost:3000/api/inngest |
 

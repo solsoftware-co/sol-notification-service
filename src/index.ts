@@ -16,7 +16,7 @@ const server = createServer((req, res) => {
   if (req.url?.startsWith("/api/inngest")) {
     return handler(req, res);
   }
-  if (req.url === "/health") {
+  if (req.url === "/api/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "ok" }));
     return;
