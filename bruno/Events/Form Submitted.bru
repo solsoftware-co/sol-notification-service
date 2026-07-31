@@ -1,0 +1,32 @@
+meta {
+  name: Form Submitted
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{eventEndpoint}}
+  body: json
+  auth: none
+}
+
+script:pre-request {
+  const inngestEnv = bru.getEnvVar("inngestEnv");
+  if (inngestEnv) {
+    req.setHeader("x-inngest-env", inngestEnv);
+  }
+}
+
+body:json {
+  {
+    "name": "form/submitted",
+    "data": {
+      "clientId": "client-acme",
+      "submitterName": "Bruno Test User",
+      "submitterEmail": "bruno-test@example.com",
+      "submitterMessage": "This is a test submission sent from Bruno.",
+      "formId": "bruno-test-form",
+      "recipients": ["{{recipientEmail}}"]
+    }
+  }
+}

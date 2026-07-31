@@ -17,10 +17,10 @@ export type EmailMode = "mock" | "test" | "live" | "mailtrap";
 export interface AppConfig {
   env: AppEnv;
   emailMode: EmailMode;
-  testEmail: string | null;
   resendApiKey: string | null;
   resendFrom: string;
-  databaseUrl: string;
+  solApiUrl: string;
+  solApiKey: string;
   logtailToken: string | null;
   mailtrapSmtpUser: string | null;
   mailtrapSmtpPass: string | null;
@@ -101,6 +101,13 @@ export interface AnalyticsReportRequestedPayload extends BaseEventPayload {
    * manual triggers send immediately.
    */
   enforceDeliveryWindow?: boolean;
+  /**
+   * Optional per-invocation recipient override.
+   * When present and valid, these addresses receive the report
+   * instead of the stored settings or client.email.
+   * Invalid entries are discarded; empty array treated as absent.
+   */
+  recipients?: string[];
 }
 
 export interface ClientRow {
@@ -168,7 +175,6 @@ export interface EmailRequest {
 export interface EmailResult {
   mode: EmailMode;
   originalTo: string | string[];
-  actualTo: string | string[];
   subject: string;
   outcome: "sent" | "logged";
   resendId?: string;

@@ -1,6 +1,6 @@
 import { inngest } from "../client";
 import { config } from "../../lib/config";
-import { getClientById, writeNotificationLog } from "../../lib/db";
+import { getClientById, writeNotificationLog } from "../../lib/sol-api";
 import { sendEmail } from "../../lib/email";
 import { appendSheetRow } from "../../lib/sheets";
 import { resolveRecipients } from "../../lib/notifications";

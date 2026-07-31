@@ -7,15 +7,15 @@ vi.mock("../../../../src/lib/config", () => ({
   config: {
     env: "production",
     emailMode: "live",
-    testEmail: null,
     resendApiKey: "re_test",
     resendFrom: "no-reply@test.local",
-    databaseUrl: "postgresql://mock",
+    solApiUrl: "https://sol-api-staging.solsoftware.workers.dev",
+    solApiKey: "test-key",
     ga4CredentialsJson: null,
   },
 }));
 
-vi.mock("../../../../src/lib/db", () => ({
+vi.mock("../../../../src/lib/sol-api", () => ({
   getAllActiveClients: mockGetAllActiveClients,
 }));
 
@@ -96,7 +96,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("fetch-active-clients step", () => {
-  it("calls getAllActiveClients without testOnly/limit in production", async () => {
+  it("calls getAllActiveClients without a limit in production", async () => {
     vi.mocked(config).env = "production";
     mockGetAllActiveClients.mockResolvedValue(clients);
 
@@ -110,12 +110,11 @@ describe("fetch-active-clients step", () => {
 
     expect(output.step.op).toBe("StepRun");
     expect(mockGetAllActiveClients).toHaveBeenCalledWith({
-      testOnly: false,
       limit: undefined,
     });
   });
 
-  it("calls getAllActiveClients with testOnly:true + limit:1 in development", async () => {
+  it("calls getAllActiveClients with limit:1 in development", async () => {
     vi.mocked(config).env = "development";
     mockGetAllActiveClients.mockResolvedValue([clients[0]]);
 
@@ -129,7 +128,6 @@ describe("fetch-active-clients step", () => {
 
     expect(output.step.op).toBe("StepRun");
     expect(mockGetAllActiveClients).toHaveBeenCalledWith({
-      testOnly: true,
       limit: 1,
     });
   });
@@ -181,23 +179,23 @@ describe("fan-out — zero active clients", () => {
 // ---------------------------------------------------------------------------
 
 describe("non-production environment filter", () => {
-  it("development with 3 clients → getAllActiveClients called with testOnly:true, limit:1", async () => {
+  it("development with 3 clients → getAllActiveClients called with limit:1", async () => {
     vi.mocked(config).env = "development";
-    // DB helper already filters to 1; return just 1 client as it would in reality
+    // sol-api staging is a physically separate DB from production, so the
+    // limit is purely a cost/speed cap now, not a safety filter.
     mockGetAllActiveClients.mockResolvedValue([clients[0]]);
 
     const capturedEvents: any[] = [];
     const { result } = await makeEngine(capturedEvents).execute();
 
     expect(mockGetAllActiveClients).toHaveBeenCalledWith({
-      testOnly: true,
       limit: 1,
     });
     expect(capturedEvents).toHaveLength(1);
     expect((result as any).dispatched).toBe(1);
   });
 
-  it("production with 3 clients → no testOnly or limit applied", async () => {
+  it("production with 3 clients → no limit applied", async () => {
     vi.mocked(config).env = "production";
     mockGetAllActiveClients.mockResolvedValue(clients);
 
@@ -205,7 +203,6 @@ describe("non-production environment filter", () => {
     await makeEngine(capturedEvents).execute();
 
     expect(mockGetAllActiveClients).toHaveBeenCalledWith({
-      testOnly: false,
       limit: undefined,
     });
     expect(capturedEvents).toHaveLength(3);

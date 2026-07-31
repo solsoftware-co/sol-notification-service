@@ -1,4 +1,4 @@
-name: E2E Email Tests
+name: PR
 
 on:
   pull_request:
@@ -11,7 +11,31 @@ permissions:
   statuses: read
 
 jobs:
-  # ── Step 1: Detect which email flows were affected by this PR ─────────────
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run type-check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm test
+
+  # ── Detect which email flows were affected by this PR ──────────────────────
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -38,44 +62,56 @@ jobs:
               - 'src/inngest/functions/index.ts'
               - 'src/types/index.ts'
 
-  # ── Step 2: Wait for Vercel Preview deployment to be ready ────────────────
+  # ── Sync sol-api creds into Preview, then deploy ourselves ─────────────────
+  # GitHub Secrets are the source of truth; this pushes them into Vercel so
+  # nobody has to hand-type values into the Vercel dashboard. Preview points
+  # at sol-api's staging deployment — same credentials the persistent
+  # "staging" custom environment uses post-merge.
+  #
+  # We deploy explicitly here (rather than relying on Vercel's automatic
+  # git-triggered Preview build + polling for it) because that race is not
+  # rare: Vercel typically starts building within ~3s of the push, well
+  # before this job finishes installing the CLI and syncing env vars, so
+  # the automatic deployment reliably gets built with stale/missing values.
+  # Deploying ourselves, after the sync, guarantees correct ordering.
+  sync-preview-env:
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install --global vercel@latest
+      - name: Sync SOL_API_URL / SOL_API_KEY into Preview
+        run: |
+          vercel env add SOL_API_URL preview --value "${{ secrets.SOL_API_URL_STAGING }}" --yes --force --non-interactive < /dev/null
+          vercel env add SOL_API_KEY preview --value "${{ secrets.SOL_API_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
+      - name: Deploy Preview build (post-sync)
+        id: deploy
+        run: |
+          DEPLOY_URL=$(vercel deploy --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+
+  # ── Register the Inngest app with the freshly-deployed Preview build ───────
   wait-for-deployment:
-    needs: detect-changes
-    # Only wait if at least one email flow is affected
+    needs: [detect-changes, sync-preview-env]
+    # Only run if at least one email flow is affected
     if: |
       needs.detect-changes.outputs.weekly-analytics == 'true' ||
       needs.detect-changes.outputs.form-notification == 'true' ||
       needs.detect-changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
     outputs:
-      url: ${{ steps.wait.outputs.url }}
+      url: ${{ needs.sync-preview-env.outputs.url }}
     steps:
-      - name: Wait for Vercel Preview deployment
-        id: wait
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          SHA="${{ github.event.pull_request.head.sha }}"
-          for i in $(seq 1 30); do
-            RESULT=$(curl -s "https://api.vercel.com/v6/deployments?meta-githubCommitSha=${SHA}&limit=5" \
-              -H "Authorization: Bearer ${VERCEL_TOKEN}")
-            URL=$(echo "$RESULT" | jq -r '.deployments[] | select(.state=="READY") | .url' | head -1)
-            if [ -n "$URL" ]; then
-              echo "url=https://${URL}" >> $GITHUB_OUTPUT
-              echo "Found deployment: https://${URL}"
-              exit 0
-            fi
-            echo "Waiting for deployment... (attempt $i/30)"
-            sleep 10
-          done
-          echo "Timed out waiting for Vercel deployment"
-          exit 1
-
       - name: Sync Inngest app with Preview deployment
         env:
           INNGEST_SIGNING_KEY_STAGING: ${{ secrets.INNGEST_SIGNING_KEY_STAGING }}
         run: |
-          PREVIEW_URL="${{ steps.wait.outputs.url }}"
+          PREVIEW_URL="${{ needs.sync-preview-env.outputs.url }}"
           echo "=== Step 1: PUT to app sync endpoint ==="
           curl -s -w "\nHTTP %{http_code}" -X PUT "${PREVIEW_URL}/api/inngest" \
             -H "Content-Type: application/json" || true
@@ -92,7 +128,7 @@ jobs:
           echo "Waiting 20s for sync to propagate..."
           sleep 20
 
-  # ── Step 3a: Run weekly analytics e2e tests (if affected) ─────────────────
+  # ── Run weekly analytics e2e tests (if affected) ───────────────────────────
   e2e-weekly-analytics:
     needs: [detect-changes, wait-for-deployment]
     if: |
@@ -119,7 +155,7 @@ jobs:
           MAILTRAP_ACCOUNT_ID: ${{ secrets.MAILTRAP_ACCOUNT_ID }}
           MAILTRAP_INBOX_ID: ${{ secrets.MAILTRAP_INBOX_ID }}
 
-  # ── Step 3b: Run form notification e2e tests (if affected) ────────────────
+  # ── Run form notification e2e tests (if affected) ──────────────────────────
   e2e-form-notification:
     needs: [detect-changes, wait-for-deployment]
     if: |
@@ -146,16 +182,17 @@ jobs:
           MAILTRAP_ACCOUNT_ID: ${{ secrets.MAILTRAP_ACCOUNT_ID }}
           MAILTRAP_INBOX_ID: ${{ secrets.MAILTRAP_INBOX_ID }}
 
-  # ── Step 4: Gate — the ONLY required status check on main ─────────────────
+  # ── Gate — the ONLY required status check on main ──────────────────────────
   # Succeeds if all upstream jobs passed OR were skipped (no relevant files changed).
   # Set ONLY this job as required in branch protection settings.
   ci-gate:
-    needs: [e2e-weekly-analytics, e2e-form-notification]
+    needs: [sync-preview-env, e2e-weekly-analytics, e2e-form-notification]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Write job summary
         run: |
+          SYNC="${{ needs.sync-preview-env.result }}"
           WA="${{ needs.e2e-weekly-analytics.result }}"
           FN="${{ needs.e2e-form-notification.result }}"
 
@@ -173,6 +210,7 @@ jobs:
 
           | Flow | Status |
           |------|--------|
+          | Sync Preview Env | $(status_icon $SYNC) \`$SYNC\` |
           | Weekly Analytics | $(status_icon $WA) \`$WA\` |
           | Form Notification | $(status_icon $FN) \`$FN\` |
 

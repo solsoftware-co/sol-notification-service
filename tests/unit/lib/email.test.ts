@@ -4,7 +4,6 @@ import type { EmailRequest } from "../../../src/types/index";
 // vi.hoisted refs must be declared before the vi.mock calls that use them
 const mockConfig = vi.hoisted(() => ({
   emailMode: "mock" as "mock" | "test" | "live",
-  testEmail: null as string | null,
   resendApiKey: null as string | null,
   resendFrom: "no-reply@test.local",
 }));
@@ -42,7 +41,6 @@ describe("sendEmail", () => {
     // clearAllMocks resets call history but keeps mock implementations
     vi.clearAllMocks();
     mockConfig.emailMode = "mock";
-    mockConfig.testEmail = null;
     mockConfig.resendApiKey = null;
     mockConfig.resendFrom = "no-reply@test.local";
   });
@@ -56,9 +54,8 @@ describe("sendEmail", () => {
     expect(mockEmailsSend).not.toHaveBeenCalled();
   });
 
-  it("test mode: redirects to testEmail and prefixes subject", async () => {
+  it("test mode: sends to the original recipient with a [TEST: ...] subject prefix", async () => {
     mockConfig.emailMode = "test";
-    mockConfig.testEmail = "dev@test.local";
     mockConfig.resendApiKey = "re_test";
     mockEmailsSend.mockResolvedValue({ data: { id: "msg_test" }, error: null });
 
@@ -66,10 +63,10 @@ describe("sendEmail", () => {
 
     expect(mockEmailsSend).toHaveBeenCalledOnce();
     expect(mockEmailsSend).toHaveBeenCalledWith(
-      expect.objectContaining({ to: "dev@test.local" })
+      expect.objectContaining({ to: "owner@acme.com" })
     );
-    expect(result.actualTo).toBe("dev@test.local");
-    expect(result.subject).toContain("[TEST: owner@acme.com]");
+    expect(result.originalTo).toBe("owner@acme.com");
+    expect(result.subject).toBe("[TEST: owner@acme.com] New contact form submission");
     expect(result.outcome).toBe("sent");
   });
 
@@ -84,7 +81,7 @@ describe("sendEmail", () => {
     expect(mockEmailsSend).toHaveBeenCalledWith(
       expect.objectContaining({ to: "owner@acme.com" })
     );
-    expect(result.actualTo).toBe("owner@acme.com");
+    expect(result.originalTo).toBe("owner@acme.com");
     expect(result.subject).toBe("New contact form submission");
     expect(result.outcome).toBe("sent");
   });

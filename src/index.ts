@@ -3,7 +3,7 @@ import { serve } from "inngest/node";
 import { inngest } from "./inngest/client";
 import { functions } from "./inngest/functions/index";
 import { config } from "./lib/config";
-import { checkDbConnection } from "./lib/db";
+import { checkSolApiConnection } from "./lib/sol-api";
 import { log, flush } from "./utils/logger";
 
 const handler = serve({ client: inngest, functions });
@@ -16,7 +16,7 @@ const server = createServer((req, res) => {
   if (req.url?.startsWith("/api/inngest")) {
     return handler(req, res);
   }
-  if (req.url === "/health") {
+  if (req.url === "/api/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "ok" }));
     return;
@@ -29,5 +29,5 @@ server.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
   console.log(`Inngest serve handler ready at http://localhost:${PORT}/api/inngest`);
   log(`Config loaded: env=${config.env}, emailMode=${config.emailMode}`);
-  checkDbConnection();
+  checkSolApiConnection();
 });

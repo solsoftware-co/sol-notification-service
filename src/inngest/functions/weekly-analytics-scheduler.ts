@@ -1,6 +1,6 @@
 import { inngest } from "../client";
 import { config } from "../../lib/config";
-import { getAllActiveClients } from "../../lib/db";
+import { getAllActiveClients } from "../../lib/sol-api";
 import { log, setRunContext } from "../../utils/logger";
 
 export const weeklyAnalyticsScheduler = inngest.createFunction(
@@ -16,7 +16,6 @@ export const weeklyAnalyticsScheduler = inngest.createFunction(
 
     const clients = await step.run("fetch-active-clients", async () => {
       return getAllActiveClients({
-        testOnly: config.env !== "production",
         limit: config.env !== "production" ? 1 : undefined,
       });
     });

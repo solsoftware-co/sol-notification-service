@@ -12,15 +12,15 @@ vi.mock("../../../../src/lib/config", () => ({
   config: {
     env: "development",
     emailMode: "mock",
-    testEmail: null,
     resendApiKey: null,
     resendFrom: "no-reply@test.local",
-    databaseUrl: "postgresql://mock",
+    solApiUrl: "https://sol-api-staging.solsoftware.workers.dev",
+    solApiKey: "test-key",
     ga4CredentialsJson: null,
   },
 }));
 
-vi.mock("../../../../src/lib/db", () => ({
+vi.mock("../../../../src/lib/sol-api", () => ({
   getClientById: mockGetClientById,
   writeNotificationLog: mockWriteNotificationLog,
 }));
@@ -106,7 +106,6 @@ const mockReport: AnalyticsReport = {
 const mockEmailResult: EmailResult = {
   mode: "mock",
   originalTo: ["client@example.com"],
-  actualTo: ["client@example.com"],
   subject: "Your analytics report \u2014 Feb 16 \u2013 Feb 22, 2026",
   outcome: "logged",
 };
@@ -114,7 +113,6 @@ const mockEmailResult: EmailResult = {
 const mockLiveEmailResult: EmailResult = {
   mode: "live",
   originalTo: ["client@example.com"],
-  actualTo: ["client@example.com"],
   subject: "Your analytics report \u2014 Feb 16 \u2013 Feb 22, 2026",
   outcome: "sent",
   resendId: "resend-abc123",
@@ -441,7 +439,7 @@ describe("send-email — notification preferences", () => {
 
     await tWithClient.executeStep("send-email");
 
-    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "analytics_report");
+    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "analytics_report", undefined);
     expect(mockSendEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: ["marketing@example.com", "cmo@example.com"] })
     );
@@ -462,9 +460,33 @@ describe("send-email — notification preferences", () => {
 
     await tWithClient.executeStep("send-email");
 
-    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "analytics_report");
+    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "analytics_report", undefined);
     expect(mockSendEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: ["client@example.com"] })
+    );
+  });
+
+  it("passes the event payload's recipients through to resolveRecipients", async () => {
+    mockResolveRecipients.mockReturnValue({ recipients: ["override@example.com"], source: "payload" });
+
+    const tWithClient = t.clone({
+      events: [
+        { ...baseEvent, data: { ...baseEvent.data, recipients: ["override@example.com"] } },
+      ],
+      steps: [
+        { id: "fetch-client-config", handler: () => mockClient },
+        { id: "resolve-send-time", handler: () => scheduledAt },
+        { id: "wait-for-send-window", handler: () => undefined },
+        { id: "resolve-report-period", handler: () => mockResolvedPeriod },
+        { id: "fetch-analytics-data", handler: () => mockReport },
+      ],
+    });
+
+    await tWithClient.executeStep("send-email");
+
+    expect(resolveRecipients).toHaveBeenCalledWith(mockClient, "analytics_report", ["override@example.com"]);
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: ["override@example.com"] })
     );
   });
 });

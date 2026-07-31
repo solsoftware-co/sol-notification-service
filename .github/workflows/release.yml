@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run type-check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm test
+
+  # Cuts a semantic-release version from Conventional Commit history on every
+  # merge to main: bumps package.json, updates CHANGELOG.md, tags the commit,
+  # and publishes a GitHub Release. Never publishes to npm (package is private).
+  #
+  # Uses RELEASE_GH_TOKEN (a PAT from a repo admin), not the default GITHUB_TOKEN:
+  # @semantic-release/git pushes the release commit straight to main, which the
+  # default token can't do past the required "ci-gate" status check. Admins bypass
+  # that check (enforce_admins is off), so a PAT from an admin account can push.
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [type-check, test]
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_GH_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
+
+  # Deploys every push to main to the persistent "staging" Vercel Custom
+  # Environment (bound to main, its own env vars, its own stable URL — a
+  # physically separate deployment/env-var set from Production, not just a
+  # filtered view of it). Runs the full e2e suite against it before
+  # deploy-production is allowed to run.
+  #
+  # Vercel's own auto-promotion for Production is intentionally left ON until
+  # the full pipeline below is verified end-to-end; disabling it is tracked
+  # as a separate, final step.
+  deploy-staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    needs: [type-check, test]
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm install --global vercel@latest
+
+      # Source of truth for staging config is GitHub Secrets; this keeps
+      # Vercel's env store in sync rather than requiring manual dashboard
+      # edits. --force makes it safe to re-run on every push.
+      - name: Sync staging environment variables
+        run: |
+          vercel env add SOL_API_URL staging --value "${{ secrets.SOL_API_URL_STAGING }}" --yes --force --non-interactive < /dev/null
+          vercel env add SOL_API_KEY staging --value "${{ secrets.SOL_API_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
+          vercel env add INNGEST_EVENT_KEY staging --value "${{ secrets.INNGEST_EVENT_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
+          vercel env add INNGEST_SIGNING_KEY staging --value "${{ secrets.INNGEST_SIGNING_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
+
+      - name: Deploy to staging
+        id: deploy
+        run: |
+          DEPLOY_URL=$(vercel deploy --target=staging --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Sync Inngest app with staging deployment
+        env:
+          INNGEST_SIGNING_KEY_STAGING: ${{ secrets.INNGEST_SIGNING_KEY_STAGING }}
+        run: |
+          curl -s -w "\nHTTP %{http_code}" -X PUT "${{ steps.deploy.outputs.url }}/api/inngest" \
+            -H "Content-Type: application/json" || true
+          curl -s -w "\nHTTP %{http_code}" \
+            -X POST "https://api.inngest.com/fn/register" \
+            -H "Authorization: Bearer ${INNGEST_SIGNING_KEY_STAGING}" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\": \"${{ steps.deploy.outputs.url }}/api/inngest\"}" || true
+          sleep 20
+
+      - name: Run full e2e suite against staging
+        run: npm run test:e2e
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          INNGEST_EVENT_KEY_STAGING: ${{ secrets.INNGEST_EVENT_KEY_STAGING }}
+          INNGEST_SIGNING_KEY_STAGING: ${{ secrets.INNGEST_SIGNING_KEY_STAGING }}
+          MAILTRAP_API_TOKEN: ${{ secrets.MAILTRAP_API_TOKEN }}
+          MAILTRAP_ACCOUNT_ID: ${{ secrets.MAILTRAP_ACCOUNT_ID }}
+          MAILTRAP_INBOX_ID: ${{ secrets.MAILTRAP_INBOX_ID }}
+
+  # Gated by the "production" GitHub Environment — requires manual approval
+  # (see repo Settings → Environments → production) before this job starts.
+  # Deploys the same commit that was just verified on staging.
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    environment: production
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm install --global vercel@latest
+
+      # Only sol-api credentials are synced here — INNGEST_EVENT_KEY /
+      # INNGEST_SIGNING_KEY for Production are managed by the Inngest Vercel
+      # integration itself (see CLAUDE.md), not this workflow.
+      - name: Sync production environment variables
+        run: |
+          vercel env add SOL_API_URL production --value "${{ secrets.SOL_API_URL_PRODUCTION }}" --yes --force --non-interactive < /dev/null
+          vercel env add SOL_API_KEY production --value "${{ secrets.SOL_API_KEY_PRODUCTION }}" --yes --force --non-interactive < /dev/null
+
+      - name: Deploy to production
+        run: vercel deploy --prod --yes

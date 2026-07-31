@@ -1,6 +1,6 @@
 import { inngest } from "../client";
 import { config } from "../../lib/config";
-import { getClientById, writeNotificationLog } from "../../lib/db";
+import { getClientById, writeNotificationLog } from "../../lib/sol-api";
 import { getAnalyticsReport } from "../../lib/analytics";
 import { sendEmail } from "../../lib/email";
 import { resolveRecipients } from "../../lib/notifications";
@@ -188,7 +188,7 @@ export const sendAnalyticsReport = inngest.createFunction(
 
     const result = await step.run("send-email", async () => {
       setRunContext({ runId, clientId });
-      const { recipients } = resolveRecipients(client, "analytics_report");
+      const { recipients } = resolveRecipients(client, "analytics_report", data.recipients);
       const rendered = await renderAnalyticsReportEmail(report, client, resolvedPeriod);
       const toLabel = Array.isArray(recipients) ? recipients.join(", ") : recipients;
       log(`Sending analytics report email to ${toLabel}`);
