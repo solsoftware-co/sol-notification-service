@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.1...v1.1.2) (2026-08-01)
+
+
+### Bug Fixes
+
+* **027:** promote production deployment now that domain auto-assign is off ([5596dbe](https://github.com/solsoftware-co/sol-notification-service/commit/5596dbea9aa86401e984144ae2bf77fbbfda1b26)), closes [#8](https://github.com/solsoftware-co/sol-notification-service/issues/8)
+
 ## [1.1.1](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.0...v1.1.1) (2026-07-31)
 
 
