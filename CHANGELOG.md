@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.2...v1.1.3) (2026-08-01)
+
+
+### Bug Fixes
+
+* **027:** pass --scope explicitly to vercel promote ([36ec6b1](https://github.com/solsoftware-co/sol-notification-service/commit/36ec6b142489454f44150587a2f01b23044eb72d)), closes [vercel/vercel#11712](https://github.com/vercel/vercel/issues/11712)
+
 ## [1.1.2](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.1...v1.1.2) (2026-08-01)
 
 
