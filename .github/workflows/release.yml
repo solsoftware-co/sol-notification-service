@@ -167,5 +167,9 @@ jobs:
       # bypassing this whole staged/approved pipeline). With it off, a
       # `vercel deploy --prod` build no longer automatically becomes the live
       # site — it must be explicitly promoted.
+      #
+      # Unlike `vercel deploy`, `vercel promote` does not honor VERCEL_ORG_ID /
+      # VERCEL_PROJECT_ID — it resolves scope purely from the token's default
+      # team, which isn't necessarily this project's team. --scope is required.
       - name: Promote deployment to production domain
-        run: vercel promote "${{ steps.deploy.outputs.url }}" --yes
+        run: vercel promote "${{ steps.deploy.outputs.url }}" --scope "$VERCEL_ORG_ID" --yes
