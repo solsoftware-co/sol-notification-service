@@ -157,4 +157,15 @@ jobs:
           vercel env add SOL_API_KEY production --value "${{ secrets.SOL_API_KEY_PRODUCTION }}" --yes --force --non-interactive < /dev/null
 
       - name: Deploy to production
-        run: vercel deploy --prod --yes
+        id: deploy
+        run: |
+          DEPLOY_URL=$(vercel deploy --prod --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+
+      # "Auto-assign Custom Production Domains" is disabled for this project
+      # (previously, every push to main auto-promoted straight to production,
+      # bypassing this whole staged/approved pipeline). With it off, a
+      # `vercel deploy --prod` build no longer automatically becomes the live
+      # site — it must be explicitly promoted.
+      - name: Promote deployment to production domain
+        run: vercel promote "${{ steps.deploy.outputs.url }}" --yes
