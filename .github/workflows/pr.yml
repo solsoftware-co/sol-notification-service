@@ -98,10 +98,18 @@ jobs:
         run: |
           vercel env add SOL_API_URL preview --value "${{ secrets.SOL_API_URL_STAGING }}" --yes --force --non-interactive < /dev/null
           vercel env add SOL_API_KEY preview --value "${{ secrets.SOL_API_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
+      # Checking out the PR head SHA (above) puts git in detached-HEAD
+      # state, so Vercel's auto-populated VERCEL_GIT_COMMIT_REF becomes the
+      # literal string "HEAD" instead of the branch name. The Inngest SDK
+      # falls back to that var for branch-environment naming when INNGEST_ENV
+      # isn't set, which was dumping every PR's functions into one shared
+      # "head" environment. Setting INNGEST_ENV explicitly (highest-priority
+      # override — see node_modules/inngest/helpers/env.js) restores correct
+      # per-PR isolation.
       - name: Deploy Preview build (post-sync)
         id: deploy
         run: |
-          DEPLOY_URL=$(vercel deploy --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
+          DEPLOY_URL=$(vercel deploy --env INNGEST_ENV="${{ github.head_ref }}" --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
           echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
       # Vercel's own PR comment/commit-status no longer fires now that

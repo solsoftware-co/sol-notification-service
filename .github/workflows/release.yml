@@ -108,10 +108,18 @@ jobs:
           vercel env add INNGEST_EVENT_KEY staging --value "${{ secrets.INNGEST_EVENT_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
           vercel env add INNGEST_SIGNING_KEY staging --value "${{ secrets.INNGEST_SIGNING_KEY_STAGING }}" --yes --force --non-interactive < /dev/null
 
+      # This job checks out the main branch, so VERCEL_GIT_COMMIT_REF would
+      # read "main" — the Inngest SDK falls back to that for branch-
+      # environment naming (no INNGEST_ENV set), which put every staging
+      # deploy's functions in an Inngest environment literally called "main",
+      # colliding with nothing in particular but naming nothing "staging"
+      # either. Setting INNGEST_ENV explicitly (highest-priority override —
+      # see node_modules/inngest/helpers/env.js) gives staging its own
+      # correctly-named Inngest environment.
       - name: Deploy to staging
         id: deploy
         run: |
-          DEPLOY_URL=$(vercel deploy --target=staging --meta version="${{ needs.release.outputs.version }}" --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
+          DEPLOY_URL=$(vercel deploy --target=staging --env INNGEST_ENV=staging --meta version="${{ needs.release.outputs.version }}" --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
           echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
       - name: Sync Inngest app with staging deployment
