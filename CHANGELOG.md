@@ -1,3 +1,10 @@
+## [1.1.5](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.4...v1.1.5) (2026-08-15)
+
+
+### Bug Fixes
+
+* match e2e suite's INNGEST_ENV to the staging deploy's ([4eaf512](https://github.com/solsoftware-co/sol-notification-service/commit/4eaf512ee54fe93ca99635a92a0ac70012caebcf))
+
 ## [1.1.4](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.3...v1.1.4) (2026-08-15)
 
 
