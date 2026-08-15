@@ -45,6 +45,8 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,19 +61,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
 
-  # Deploys every push to main to the persistent "staging" Vercel Custom
-  # Environment (bound to main, its own env vars, its own stable URL — a
-  # physically separate deployment/env-var set from Production, not just a
-  # filtered view of it). Runs the full e2e suite against it before
-  # deploy-production is allowed to run.
+      # package.json is bumped locally by semantic-release before it pushes
+      # the release commit, so this reflects the version just released (or
+      # the current version unchanged, if this run had nothing to release).
+      # Downstream deploy jobs tag their Vercel deployments with it via --meta.
+      - name: Read released version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+  # Deploys the release cut by the `release` job above to the persistent
+  # "staging" Vercel Custom Environment (bound to main, its own env vars, its
+  # own stable URL — a physically separate deployment/env-var set from
+  # Production, not just a filtered view of it). Runs the full e2e suite
+  # against it before deploy-production is allowed to run.
   #
-  # Vercel's own auto-promotion for Production is intentionally left ON until
-  # the full pipeline below is verified end-to-end; disabling it is tracked
-  # as a separate, final step.
+  # Vercel's git-triggered auto-deploys are fully disabled (see
+  # vercel.json → git.deploymentEnabled: false) — this workflow is the only
+  # thing that ever creates a deployment. The CLI remains unaffected by that
+  # setting.
   deploy-staging:
     name: Deploy Staging
     runs-on: ubuntu-latest
-    needs: [type-check, test]
+    needs: [release]
     outputs:
       url: ${{ steps.deploy.outputs.url }}
     env:
@@ -100,7 +111,7 @@ jobs:
       - name: Deploy to staging
         id: deploy
         run: |
-          DEPLOY_URL=$(vercel deploy --target=staging --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
+          DEPLOY_URL=$(vercel deploy --target=staging --meta version="${{ needs.release.outputs.version }}" --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
           echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
       - name: Sync Inngest app with staging deployment
@@ -133,7 +144,7 @@ jobs:
   deploy-production:
     name: Deploy Production
     runs-on: ubuntu-latest
-    needs: deploy-staging
+    needs: [deploy-staging, release]
     environment: production
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -159,7 +170,7 @@ jobs:
       - name: Deploy to production
         id: deploy
         run: |
-          DEPLOY_URL=$(vercel deploy --prod --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
+          DEPLOY_URL=$(vercel deploy --prod --meta version="${{ needs.release.outputs.version }}" --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
           echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
       # "Auto-assign Custom Production Domains" is disabled for this project

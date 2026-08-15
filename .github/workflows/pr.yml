@@ -68,12 +68,14 @@ jobs:
   # at sol-api's staging deployment — same credentials the persistent
   # "staging" custom environment uses post-merge.
   #
-  # We deploy explicitly here (rather than relying on Vercel's automatic
-  # git-triggered Preview build + polling for it) because that race is not
-  # rare: Vercel typically starts building within ~3s of the push, well
-  # before this job finishes installing the CLI and syncing env vars, so
-  # the automatic deployment reliably gets built with stale/missing values.
-  # Deploying ourselves, after the sync, guarantees correct ordering.
+  # We deploy explicitly here because it's the only way a deployment gets
+  # created at all: Vercel's git-triggered auto-deploys are fully disabled
+  # (see vercel.json → git.deploymentEnabled: false), specifically because
+  # relying on them lost this race often: Vercel typically started building
+  # within ~3s of the push, well before this job finished installing the CLI
+  # and syncing env vars, so the automatic deployment reliably got built with
+  # stale/missing values. Deploying ourselves, after the sync, guarantees
+  # correct ordering.
   sync-preview-env:
     runs-on: ubuntu-latest
     outputs:
