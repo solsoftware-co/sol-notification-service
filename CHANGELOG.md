@@ -1,3 +1,10 @@
+## [1.1.4](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.3...v1.1.4) (2026-08-15)
+
+
+### Bug Fixes
+
+* pin INNGEST_ENV explicitly instead of relying on git-ref detection ([fd3c8cb](https://github.com/solsoftware-co/sol-notification-service/commit/fd3c8cb7bdbed4ebd7026a5acc96cfef43c6b3c2))
+
 ## [1.1.3](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.2...v1.1.3) (2026-08-01)
 
 
