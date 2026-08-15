@@ -135,11 +135,17 @@ jobs:
             -d "{\"url\": \"${{ steps.deploy.outputs.url }}/api/inngest\"}" || true
           sleep 20
 
+      # Must match the --env INNGEST_ENV value passed to `vercel deploy`
+      # above, not the git ref: the app now always registers under the
+      # "staging" Inngest branch environment regardless of which branch this
+      # job happened to check out, so the e2e suite has to send its trigger
+      # events tagged the same way or they land in a different (and quickly
+      # auto-archived) environment than the one the app is actually running in.
       - name: Run full e2e suite against staging
         run: npm run test:e2e
         env:
           PREVIEW_URL: ${{ steps.deploy.outputs.url }}
-          INNGEST_ENV: ${{ github.ref_name }}
+          INNGEST_ENV: staging
           INNGEST_EVENT_KEY_STAGING: ${{ secrets.INNGEST_EVENT_KEY_STAGING }}
           INNGEST_SIGNING_KEY_STAGING: ${{ secrets.INNGEST_SIGNING_KEY_STAGING }}
           MAILTRAP_API_TOKEN: ${{ secrets.MAILTRAP_API_TOKEN }}
