@@ -1,3 +1,10 @@
+## [1.1.6](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.5...v1.1.6) (2026-08-15)
+
+
+### Bug Fixes
+
+* correct Bruno staging/PR-preview environment files ([c8b14d7](https://github.com/solsoftware-co/sol-notification-service/commit/c8b14d7d24d4dddad44d422a1d8162e9f7fed5b8))
+
 ## [1.1.5](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.4...v1.1.5) (2026-08-15)
 
 
