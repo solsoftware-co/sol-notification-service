@@ -85,7 +85,14 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
+      # pull_request events default to checking out the synthetic
+      # refs/pull/N/merge commit, whose auto-generated message ("Merge
+      # <sha> into <sha>") is what Vercel would otherwise show as the
+      # deployment title. Pinning to the actual PR head commit makes that
+      # title the real, human-written commit message instead.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - run: npm install --global vercel@latest
       - name: Sync SOL_API_URL / SOL_API_KEY into Preview
         run: |
