@@ -6,7 +6,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
   deployments: read
   statuses: read
 
@@ -96,6 +96,16 @@ jobs:
         run: |
           DEPLOY_URL=$(vercel deploy --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
           echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+
+      # Vercel's own PR comment/commit-status no longer fires now that
+      # git.deploymentEnabled is false (see vercel.json) — it doesn't post
+      # anything for deployments it didn't trigger itself. This replaces it.
+      - name: Comment preview URL on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview-url
+          message: |
+            🔗 **Preview deployment:** ${{ steps.deploy.outputs.url }}
 
   # ── Register the Inngest app with the freshly-deployed Preview build ───────
   wait-for-deployment:
