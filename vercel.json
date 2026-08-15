@@ -5,5 +5,8 @@
   "functions": {
     "api/inngest.ts": { "maxDuration": 60 },
     "api/health.ts":  { "maxDuration": 10 }
+  },
+  "git": {
+    "deploymentEnabled": false
   }
 }

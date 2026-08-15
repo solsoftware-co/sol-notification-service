@@ -6,7 +6,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
   deployments: read
   statuses: read
 
@@ -68,12 +68,14 @@ jobs:
   # at sol-api's staging deployment — same credentials the persistent
   # "staging" custom environment uses post-merge.
   #
-  # We deploy explicitly here (rather than relying on Vercel's automatic
-  # git-triggered Preview build + polling for it) because that race is not
-  # rare: Vercel typically starts building within ~3s of the push, well
-  # before this job finishes installing the CLI and syncing env vars, so
-  # the automatic deployment reliably gets built with stale/missing values.
-  # Deploying ourselves, after the sync, guarantees correct ordering.
+  # We deploy explicitly here because it's the only way a deployment gets
+  # created at all: Vercel's git-triggered auto-deploys are fully disabled
+  # (see vercel.json → git.deploymentEnabled: false), specifically because
+  # relying on them lost this race often: Vercel typically started building
+  # within ~3s of the push, well before this job finished installing the CLI
+  # and syncing env vars, so the automatic deployment reliably got built with
+  # stale/missing values. Deploying ourselves, after the sync, guarantees
+  # correct ordering.
   sync-preview-env:
     runs-on: ubuntu-latest
     outputs:
@@ -83,7 +85,14 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
+      # pull_request events default to checking out the synthetic
+      # refs/pull/N/merge commit, whose auto-generated message ("Merge
+      # <sha> into <sha>") is what Vercel would otherwise show as the
+      # deployment title. Pinning to the actual PR head commit makes that
+      # title the real, human-written commit message instead.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - run: npm install --global vercel@latest
       - name: Sync SOL_API_URL / SOL_API_KEY into Preview
         run: |
@@ -94,6 +103,16 @@ jobs:
         run: |
           DEPLOY_URL=$(vercel deploy --yes --non-interactive < /dev/null 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
           echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+
+      # Vercel's own PR comment/commit-status no longer fires now that
+      # git.deploymentEnabled is false (see vercel.json) — it doesn't post
+      # anything for deployments it didn't trigger itself. This replaces it.
+      - name: Comment preview URL on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview-url
+          message: |
+            🔗 **Preview deployment:** ${{ steps.deploy.outputs.url }}
 
   # ── Register the Inngest app with the freshly-deployed Preview build ───────
   wait-for-deployment:
