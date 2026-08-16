@@ -1,3 +1,10 @@
+## [1.1.7](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.6...v1.1.7) (2026-08-16)
+
+
+### Bug Fixes
+
+* scope credential fetch to Google, matching sol-api's renamed param ([45e5d13](https://github.com/solsoftware-co/sol-notification-service/commit/45e5d136e6152c0953601bd49a47b683d6e097ea)), closes [solsoftware-co/sol-api#14](https://github.com/solsoftware-co/sol-api/issues/14)
+
 ## [1.1.6](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.5...v1.1.6) (2026-08-15)
 
 
