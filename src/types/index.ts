@@ -131,8 +131,8 @@ export interface ClientRecord {
  */
 export type ClientSummary = Omit<ClientRecord, "google_service_account_key">;
 
-/** The Google service-account credential, fetched separately via getClientCredentials(). */
-export type ClientCredentials = Pick<ClientRecord, "google_service_account_key">;
+/** The Google service-account credential, fetched separately via getClientGoogleCredentials(). */
+export type ClientGoogleCredentials = Pick<ClientRecord, "google_service_account_key">;
 
 export interface NotificationLogRow {
   id: number;

@@ -1,6 +1,6 @@
 import { inngest } from "../client";
 import { config } from "../../lib/config";
-import { getClientById, getClientCredentials, writeNotificationLog } from "../../lib/sol-api";
+import { getClientById, getClientGoogleCredentials, writeNotificationLog } from "../../lib/sol-api";
 import { sendEmail } from "../../lib/email";
 import { appendSheetRow } from "../../lib/sheets";
 import { resolveRecipients } from "../../lib/notifications";
@@ -88,7 +88,7 @@ export const sendFormNotification = inngest.createFunction(
       if (config.emailMode !== "live") {
         return { skipped: true, reason: "non-live mode" };
       }
-      const { google_service_account_key } = await getClientCredentials(clientId);
+      const { google_service_account_key } = await getClientGoogleCredentials(clientId);
       if (!google_service_account_key) {
         return { skipped: true, reason: "no credentials on client" };
       }

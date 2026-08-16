@@ -1,7 +1,7 @@
 // T014 + T015 + T019 + T029 + T008(022): analytics-report unit tests
 
 const mockGetClientById = vi.hoisted(() => vi.fn());
-const mockGetClientCredentials = vi.hoisted(() => vi.fn());
+const mockGetClientGoogleCredentials = vi.hoisted(() => vi.fn());
 const mockGetAnalyticsReport = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockRenderAnalyticsReport = vi.hoisted(() => vi.fn());
@@ -23,7 +23,7 @@ vi.mock("../../../../src/lib/config", () => ({
 
 vi.mock("../../../../src/lib/sol-api", () => ({
   getClientById: mockGetClientById,
-  getClientCredentials: mockGetClientCredentials,
+  getClientGoogleCredentials: mockGetClientGoogleCredentials,
   writeNotificationLog: mockWriteNotificationLog,
 }));
 
@@ -168,7 +168,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   (config as any).emailMode = "mock"; // reset to default before each test
   mockGetClientById.mockResolvedValue(mockClient);
-  mockGetClientCredentials.mockResolvedValue({
+  mockGetClientGoogleCredentials.mockResolvedValue({
     google_service_account_key: mockClient.google_service_account_key,
   });
   mockGetAnalyticsReport.mockResolvedValue(mockReport);

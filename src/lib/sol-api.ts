@@ -1,5 +1,5 @@
 import { config } from "./config";
-import type { ClientRecord, ClientSummary, ClientCredentials, NotificationLogEntry } from "../types/index";
+import type { ClientRecord, ClientSummary, ClientGoogleCredentials, NotificationLogEntry } from "../types/index";
 
 const FETCH_TIMEOUT_MS = 10_000;
 
@@ -39,17 +39,19 @@ export async function getClientById(id: string): Promise<ClientSummary> {
   return solApiFetch<ClientSummary>(`/v1/clients/${encodeURIComponent(id)}`);
 }
 
-// `?include=credentials` is not yet understood by sol-api — it's ignored and
-// the full record comes back regardless, so this is safe to call today. Once
-// sol-api excludes google_service_account_key by default, this becomes the
-// only way to get it back. Call this only from inside the step that actually
-// uses the key, never from a general-purpose "fetch client config" step, so
-// the credential never ends up in a step's persisted output.
-export async function getClientCredentials(
+// `?include=google_credentials` isn't live in sol-api production yet
+// (solsoftware-co/sol-api#14) — until it ships, this param is ignored and the
+// full record comes back regardless, so this is safe to call today. Once it
+// deploys, this becomes the only way to get the key back, since
+// GET /v1/clients/:id excludes it by default. Call this only from inside the
+// step that actually uses the key, never from a general-purpose "fetch
+// client config" step, so the credential never ends up in a step's
+// persisted output.
+export async function getClientGoogleCredentials(
   id: string
-): Promise<ClientCredentials> {
-  return solApiFetch<ClientCredentials>(
-    `/v1/clients/${encodeURIComponent(id)}?include=credentials`
+): Promise<ClientGoogleCredentials> {
+  return solApiFetch<ClientGoogleCredentials>(
+    `/v1/clients/${encodeURIComponent(id)}?include=google_credentials`
   );
 }
 
