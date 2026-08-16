@@ -21,7 +21,7 @@ vi.mock("../../../../src/lib/config", () => ({
 
 vi.mock("../../../../src/lib/sol-api", () => ({
   getClientById: vi.fn(),
-  getClientCredentials: vi.fn(),
+  getClientGoogleCredentials: vi.fn(),
   writeNotificationLog: mockWriteNotificationLog,
 }));
 
@@ -46,7 +46,7 @@ vi.mock("../../../../src/utils/logger", () => ({
 
 // Imports after mocks
 import { sendFormNotification } from "../../../../src/inngest/functions/form-notification";
-import { getClientById, getClientCredentials } from "../../../../src/lib/sol-api";
+import { getClientById, getClientGoogleCredentials } from "../../../../src/lib/sol-api";
 import { sendEmail } from "../../../../src/lib/email";
 import { resolveRecipients } from "../../../../src/lib/notifications";
 import { config } from "../../../../src/lib/config";
@@ -127,7 +127,7 @@ function freshEngine() {
 beforeEach(() => {
   vi.resetAllMocks();
   (config as any).emailMode = "mock"; // reset to default before each test
-  vi.mocked(getClientCredentials).mockResolvedValue({
+  vi.mocked(getClientGoogleCredentials).mockResolvedValue({
     google_service_account_key: mockClient.google_service_account_key,
   });
   mockRenderFormNotification.mockResolvedValue(mockRenderResult);
