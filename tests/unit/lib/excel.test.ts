@@ -4,13 +4,13 @@
 import * as XLSX from 'xlsx';
 import { describe, it, expect } from 'vitest';
 import { buildAnalyticsExcel, buildExcelFilename } from '../../../src/lib/excel';
-import type { AnalyticsReport, ClientRow, ResolvedPeriod } from '../../../src/types/index';
+import type { AnalyticsReport, ClientRecord, ResolvedPeriod } from '../../../src/types/index';
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const mockClient: ClientRow = {
+const mockClient: ClientRecord = {
   id: 'acme',
   name: 'Acme Corp',
   email: 'hello@acmecorp.com',

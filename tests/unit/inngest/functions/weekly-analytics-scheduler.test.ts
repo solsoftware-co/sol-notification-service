@@ -29,13 +29,13 @@ vi.mock("../../../../src/utils/logger", () => ({
 import { InngestTestEngine, mockCtx } from "@inngest/test";
 import { weeklyAnalyticsScheduler } from "../../../../src/inngest/functions/weekly-analytics-scheduler";
 import { config } from "../../../../src/lib/config";
-import type { ClientRow } from "../../../../src/types/index";
+import type { ClientRecord } from "../../../../src/types/index";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeClient(id: string, email: string): ClientRow {
+function makeClient(id: string, email: string): ClientRecord {
   return {
     id,
     name: `Client ${id}`,

@@ -110,7 +110,7 @@ export interface AnalyticsReportRequestedPayload extends BaseEventPayload {
   recipients?: string[];
 }
 
-export interface ClientRow {
+export interface ClientRecord {
   id: string;
   name: string;
   email: string;
@@ -122,6 +122,17 @@ export interface ClientRow {
   google_service_account_key: string | null;
   timezone: SupportedTimezone;
 }
+
+/**
+ * ClientRecord without the Google service-account credential. Steps that only
+ * need identity/config fields (recipients, rendering, timezone resolution)
+ * should be typed on this, not ClientRecord, so the credential can't leak into
+ * a step's persisted output via those code paths.
+ */
+export type ClientSummary = Omit<ClientRecord, "google_service_account_key">;
+
+/** The Google service-account credential, fetched separately via getClientCredentials(). */
+export type ClientCredentials = Pick<ClientRecord, "google_service_account_key">;
 
 export interface NotificationLogRow {
   id: number;

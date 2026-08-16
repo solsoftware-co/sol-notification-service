@@ -1,5 +1,5 @@
 import { InngestTestEngine, mockCtx } from "@inngest/test";
-import type { ClientRow, EmailResult } from "../../../../src/types/index";
+import type { ClientRecord, EmailResult } from "../../../../src/types/index";
 
 // Hoisted mock refs — declared before vi.mock() factories
 const mockRenderFormNotification = vi.hoisted(() => vi.fn());
@@ -21,6 +21,7 @@ vi.mock("../../../../src/lib/config", () => ({
 
 vi.mock("../../../../src/lib/sol-api", () => ({
   getClientById: vi.fn(),
+  getClientCredentials: vi.fn(),
   writeNotificationLog: mockWriteNotificationLog,
 }));
 
@@ -45,7 +46,7 @@ vi.mock("../../../../src/utils/logger", () => ({
 
 // Imports after mocks
 import { sendFormNotification } from "../../../../src/inngest/functions/form-notification";
-import { getClientById } from "../../../../src/lib/sol-api";
+import { getClientById, getClientCredentials } from "../../../../src/lib/sol-api";
 import { sendEmail } from "../../../../src/lib/email";
 import { resolveRecipients } from "../../../../src/lib/notifications";
 import { config } from "../../../../src/lib/config";
@@ -65,7 +66,7 @@ const validEvent = {
   },
 };
 
-const mockClient: ClientRow = {
+const mockClient: ClientRecord = {
   id: "client-acme",
   name: "Acme Corp",
   email: "owner@acme.com",
@@ -126,6 +127,9 @@ function freshEngine() {
 beforeEach(() => {
   vi.resetAllMocks();
   (config as any).emailMode = "mock"; // reset to default before each test
+  vi.mocked(getClientCredentials).mockResolvedValue({
+    google_service_account_key: mockClient.google_service_account_key,
+  });
   mockRenderFormNotification.mockResolvedValue(mockRenderResult);
   // Default: no preferences configured — resolveRecipients falls back to client.email
   mockResolveRecipients.mockReturnValue({ recipients: ["owner@acme.com"], source: "client_email" });

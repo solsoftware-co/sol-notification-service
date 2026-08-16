@@ -1,4 +1,4 @@
-import type { ClientRow } from "../../../src/types/index";
+import type { ClientRecord } from "../../../src/types/index";
 
 const mockLogError = vi.hoisted(() => vi.fn());
 
@@ -14,7 +14,7 @@ import { resolveRecipients } from "../../../src/lib/notifications";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeClient(overrides: Partial<ClientRow> = {}): ClientRow {
+function makeClient(overrides: Partial<ClientRecord> = {}): ClientRecord {
   return {
     id: "client-test",
     name: "Test Client",

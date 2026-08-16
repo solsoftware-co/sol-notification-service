@@ -1,6 +1,6 @@
 import { inngest } from "../client";
 import { config } from "../../lib/config";
-import { getClientById, writeNotificationLog } from "../../lib/sol-api";
+import { getClientById, getClientCredentials, writeNotificationLog } from "../../lib/sol-api";
 import { getAnalyticsReport } from "../../lib/analytics";
 import { sendEmail } from "../../lib/email";
 import { resolveRecipients } from "../../lib/notifications";
@@ -175,10 +175,11 @@ export const sendAnalyticsReport = inngest.createFunction(
     const report = await step.run("fetch-analytics-data", async () => {
       setRunContext({ runId, clientId });
       log(`Querying GA4 property ${client.ga4_property_id ?? "(none)"} for client ${clientId}`);
+      const { google_service_account_key } = await getClientCredentials(clientId);
       return getAnalyticsReport(
         client.ga4_property_id!,
         resolvedPeriod,
-        client.google_service_account_key,
+        google_service_account_key,
         {
           topSourcesLimit: data.topSourcesLimit,
           topPagesLimit: data.topPagesLimit,

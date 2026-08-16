@@ -58,7 +58,7 @@ vi.mock('../../../src/lib/excel', () => ({
 }));
 
 import { renderFormNotificationEmail, renderAnalyticsReportEmail, buildReportTitle, pageTitle, categorizeSource, resolveCta, parseBannerConfig, loadBannerAttachment } from '../../../src/lib/templates';
-import type { FormSubmittedPayload, ClientRow, AnalyticsReport, ResolvedPeriod, ReportPeriodPreset } from '../../../src/types/index';
+import type { FormSubmittedPayload, ClientRecord, AnalyticsReport, ResolvedPeriod, ReportPeriodPreset } from '../../../src/types/index';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -68,7 +68,7 @@ const mockBannerBuffer = Buffer.from('fake-png-data');
 const mockChartBuffer = Buffer.from('fake-chart-png');
 const mockHtml = '<html><body>mock email content</body></html>';
 
-const mockClient: ClientRow = {
+const mockClient: ClientRecord = {
   id: 'acme',
   name: 'Acme Corp',
   email: 'hello@acmecorp.com',
