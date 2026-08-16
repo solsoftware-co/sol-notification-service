@@ -1,4 +1,4 @@
-import type { ClientRow, RecipientResolutionResult } from "../types/index";
+import type { ClientSummary, RecipientResolutionResult } from "../types/index";
 import { logError } from "../utils/logger";
 
 /**
@@ -66,7 +66,7 @@ function filterAddresses(
  * Never throws — invalid entries are logged and discarded.
  */
 export function resolveRecipients(
-  client: ClientRow,
+  client: ClientSummary,
   workflowKey: string,
   payloadRecipients: string[] | undefined
 ): RecipientResolutionResult {

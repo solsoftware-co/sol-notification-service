@@ -15,7 +15,7 @@ import type { ReportPeriodPreset } from '../types/index';
 import type {
   FormSubmittedPayload,
   FormNotificationCtaButton,
-  ClientRow,
+  ClientSummary,
   EmailRenderResult,
   EmailAttachment,
   AnalyticsReport,
@@ -265,7 +265,7 @@ export function resolveCta(
 
 export async function renderFormNotificationEmail(
   payload: FormSubmittedPayload,
-  client: ClientRow,
+  client: ClientSummary,
 ): Promise<EmailRenderResult> {
   const bannerConfig = parseBannerConfig(client.settings);
   const banner = await loadBannerAttachment(bannerConfig.imageUrl);
@@ -320,7 +320,7 @@ export async function renderFormNotificationEmail(
 
 export async function renderAnalyticsReportEmail(
   report: AnalyticsReport,
-  client: ClientRow,
+  client: ClientSummary,
   period: ResolvedPeriod,
 ): Promise<EmailRenderResult> {
   const bannerConfig = parseBannerConfig(client.settings);

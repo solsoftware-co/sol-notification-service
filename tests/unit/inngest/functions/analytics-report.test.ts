@@ -1,6 +1,7 @@
 // T014 + T015 + T019 + T029 + T008(022): analytics-report unit tests
 
 const mockGetClientById = vi.hoisted(() => vi.fn());
+const mockGetClientCredentials = vi.hoisted(() => vi.fn());
 const mockGetAnalyticsReport = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockRenderAnalyticsReport = vi.hoisted(() => vi.fn());
@@ -22,6 +23,7 @@ vi.mock("../../../../src/lib/config", () => ({
 
 vi.mock("../../../../src/lib/sol-api", () => ({
   getClientById: mockGetClientById,
+  getClientCredentials: mockGetClientCredentials,
   writeNotificationLog: mockWriteNotificationLog,
 }));
 
@@ -57,7 +59,7 @@ import { sendAnalyticsReport } from "../../../../src/inngest/functions/analytics
 import { resolveRecipients } from "../../../../src/lib/notifications";
 import { config } from "../../../../src/lib/config";
 import type {
-  ClientRow,
+  ClientRecord,
   AnalyticsReport,
   EmailResult,
   ResolvedPeriod,
@@ -71,7 +73,7 @@ import type {
 // scheduledAt is a Tuesday — critical for last_week date math assertions
 const scheduledAt = "2026-02-24T09:00:00.000Z";
 
-const mockClient: ClientRow = {
+const mockClient: ClientRecord = {
   id: "client-1",
   name: "Test Client",
   email: "client@example.com",
@@ -166,6 +168,9 @@ beforeEach(() => {
   vi.resetAllMocks();
   (config as any).emailMode = "mock"; // reset to default before each test
   mockGetClientById.mockResolvedValue(mockClient);
+  mockGetClientCredentials.mockResolvedValue({
+    google_service_account_key: mockClient.google_service_account_key,
+  });
   mockGetAnalyticsReport.mockResolvedValue(mockReport);
   mockSendEmail.mockResolvedValue(mockEmailResult);
   mockRenderAnalyticsReport.mockResolvedValue({

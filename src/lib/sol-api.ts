@@ -1,5 +1,5 @@
 import { config } from "./config";
-import type { ClientRow, NotificationLogEntry } from "../types/index";
+import type { ClientRecord, ClientSummary, ClientCredentials, NotificationLogEntry } from "../types/index";
 
 const FETCH_TIMEOUT_MS = 10_000;
 
@@ -35,13 +35,27 @@ async function solApiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return body.data;
 }
 
-export async function getClientById(id: string): Promise<ClientRow> {
-  return solApiFetch<ClientRow>(`/v1/clients/${encodeURIComponent(id)}`);
+export async function getClientById(id: string): Promise<ClientSummary> {
+  return solApiFetch<ClientSummary>(`/v1/clients/${encodeURIComponent(id)}`);
+}
+
+// `?include=credentials` is not yet understood by sol-api — it's ignored and
+// the full record comes back regardless, so this is safe to call today. Once
+// sol-api excludes google_service_account_key by default, this becomes the
+// only way to get it back. Call this only from inside the step that actually
+// uses the key, never from a general-purpose "fetch client config" step, so
+// the credential never ends up in a step's persisted output.
+export async function getClientCredentials(
+  id: string
+): Promise<ClientCredentials> {
+  return solApiFetch<ClientCredentials>(
+    `/v1/clients/${encodeURIComponent(id)}?include=credentials`
+  );
 }
 
 export async function getAllActiveClients(options?: {
   limit?: number;
-}): Promise<ClientRow[]> {
+}): Promise<ClientRecord[]> {
   const params = new URLSearchParams();
   if (options?.limit !== undefined) {
     params.set("limit", String(options.limit));
@@ -52,7 +66,7 @@ export async function getAllActiveClients(options?: {
   // omitted at the list level; callers that need it fetch the full record
   // via getClientById.
   const rows = await solApiFetch<
-    (Omit<ClientRow, "google_service_account_key"> & {
+    (Omit<ClientRecord, "google_service_account_key"> & {
       google_service_account_key?: string | null;
     })[]
   >(`/v1/clients${qs ? `?${qs}` : ""}`);

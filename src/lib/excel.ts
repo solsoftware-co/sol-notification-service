@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import type { AnalyticsReport, ClientRow, ResolvedPeriod } from '../types/index';
+import type { AnalyticsReport, ClientSummary, ResolvedPeriod } from '../types/index';
 
 function formatDuration(secs: number): string {
   const m = Math.floor(secs / 60);
@@ -7,7 +7,7 @@ function formatDuration(secs: number): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-export function buildExcelFilename(client: ClientRow, period: ResolvedPeriod): string {
+export function buildExcelFilename(client: ClientSummary, period: ResolvedPeriod): string {
   const slug = client.name
     .toLowerCase()
     .replace(/\s+/g, '-')
@@ -17,7 +17,7 @@ export function buildExcelFilename(client: ClientRow, period: ResolvedPeriod): s
 
 export async function buildAnalyticsExcel(
   report: AnalyticsReport,
-  client: ClientRow,
+  client: ClientSummary,
   period: ResolvedPeriod,
 ): Promise<Buffer> {
   const wb = XLSX.utils.book_new();

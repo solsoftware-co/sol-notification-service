@@ -18,7 +18,7 @@ import {
   getAllActiveClients,
   writeNotificationLog,
 } from "../../../src/lib/sol-api";
-import type { ClientRow, NotificationLogEntry } from "../../../src/types/index";
+import type { ClientRecord, NotificationLogEntry } from "../../../src/types/index";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -36,7 +36,7 @@ function jsonResponse(body: unknown) {
   return { json: async () => body };
 }
 
-const mockClientRow: ClientRow = {
+const mockClientRecord: ClientRecord = {
   id: "client-acme",
   name: "Acme Corp",
   email: "owner@acme.com",
@@ -67,11 +67,11 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 describe("getClientById", () => {
   it("returns the client on a successful response", async () => {
-    mockFetch.mockResolvedValue(jsonResponse(envelope(mockClientRow)));
+    mockFetch.mockResolvedValue(jsonResponse(envelope(mockClientRecord)));
 
     const result = await getClientById("client-acme");
 
-    expect(result).toEqual(mockClientRow);
+    expect(result).toEqual(mockClientRecord);
     const [url, init] = mockFetch.mock.calls[0];
     expect(url).toBe(
       "https://sol-api-staging.solsoftware.workers.dev/v1/clients/client-acme"
@@ -95,7 +95,7 @@ describe("getClientById", () => {
 // ---------------------------------------------------------------------------
 describe("getAllActiveClients", () => {
   it("appends limit as a query param when provided", async () => {
-    mockFetch.mockResolvedValue(jsonResponse(envelope([mockClientRow])));
+    mockFetch.mockResolvedValue(jsonResponse(envelope([mockClientRecord])));
 
     await getAllActiveClients({ limit: 1 });
 
@@ -106,7 +106,7 @@ describe("getAllActiveClients", () => {
   });
 
   it("omits the query string when no limit is provided", async () => {
-    mockFetch.mockResolvedValue(jsonResponse(envelope([mockClientRow])));
+    mockFetch.mockResolvedValue(jsonResponse(envelope([mockClientRecord])));
 
     await getAllActiveClients();
 
@@ -117,7 +117,7 @@ describe("getAllActiveClients", () => {
   });
 
   it("defaults a missing google_service_account_key to null (list responses omit it)", async () => {
-    const { google_service_account_key: _omit, ...summary } = mockClientRow;
+    const { google_service_account_key: _omit, ...summary } = mockClientRecord;
     mockFetch.mockResolvedValue(jsonResponse(envelope([summary])));
 
     const [result] = await getAllActiveClients();

@@ -1,6 +1,6 @@
 import { inngest } from "../client";
 import { config } from "../../lib/config";
-import { getClientById, writeNotificationLog } from "../../lib/sol-api";
+import { getClientById, getClientCredentials, writeNotificationLog } from "../../lib/sol-api";
 import { sendEmail } from "../../lib/email";
 import { appendSheetRow } from "../../lib/sheets";
 import { resolveRecipients } from "../../lib/notifications";
@@ -85,16 +85,17 @@ export const sendFormNotification = inngest.createFunction(
       if (!data.sheetsDestination) {
         return { skipped: true, reason: "no destination in payload" };
       }
-      if (!client.google_service_account_key) {
-        return { skipped: true, reason: "no credentials on client" };
-      }
       if (config.emailMode !== "live") {
         return { skipped: true, reason: "non-live mode" };
+      }
+      const { google_service_account_key } = await getClientCredentials(clientId);
+      if (!google_service_account_key) {
+        return { skipped: true, reason: "no credentials on client" };
       }
       const fields = buildFieldMap(data);
       const timestamp = new Date().toISOString();
       return appendSheetRow(
-        client.google_service_account_key,
+        google_service_account_key,
         data.sheetsDestination,
         fields,
         timestamp
