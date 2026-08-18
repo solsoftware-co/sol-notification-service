@@ -1,5 +1,5 @@
 import { config } from "./config";
-import type { ClientRecord, ClientSummary, ClientGoogleCredentials, NotificationLogEntry } from "../types/index";
+import type { ClientRecord, ClientSummary, ClientGoogleCredentials, ClientSlackCredentials, NotificationLogEntry } from "../types/index";
 
 const FETCH_TIMEOUT_MS = 10_000;
 
@@ -39,19 +39,27 @@ export async function getClientById(id: string): Promise<ClientSummary> {
   return solApiFetch<ClientSummary>(`/v1/clients/${encodeURIComponent(id)}`);
 }
 
-// `?include=google_credentials` isn't live in sol-api production yet
-// (solsoftware-co/sol-api#14) — until it ships, this param is ignored and the
-// full record comes back regardless, so this is safe to call today. Once it
-// deploys, this becomes the only way to get the key back, since
-// GET /v1/clients/:id excludes it by default. Call this only from inside the
-// step that actually uses the key, never from a general-purpose "fetch
-// client config" step, so the credential never ends up in a step's
-// persisted output.
+// GET /v1/clients/:id excludes google_service_account_key by default;
+// ?include=google_credentials is the only way to get it back. Call this only
+// from inside the step that actually uses the key, never from a
+// general-purpose "fetch client config" step, so the credential never ends
+// up in a step's persisted output.
 export async function getClientGoogleCredentials(
   id: string
 ): Promise<ClientGoogleCredentials> {
   return solApiFetch<ClientGoogleCredentials>(
     `/v1/clients/${encodeURIComponent(id)}?include=google_credentials`
+  );
+}
+
+// Same pattern as getClientGoogleCredentials — GET /v1/clients/:id excludes
+// slack_webhook_url by default; ?include=slack_credentials opts back in.
+// Call this only from inside the step that actually posts to Slack.
+export async function getClientSlackCredentials(
+  id: string
+): Promise<ClientSlackCredentials> {
+  return solApiFetch<ClientSlackCredentials>(
+    `/v1/clients/${encodeURIComponent(id)}?include=slack_credentials`
   );
 }
 
@@ -64,18 +72,20 @@ export async function getAllActiveClients(options?: {
   }
   const qs = params.toString();
 
-  // GET /v1/clients returns ClientSummary — google_service_account_key is
-  // omitted at the list level; callers that need it fetch the full record
-  // via getClientById.
+  // GET /v1/clients returns ClientSummary — google_service_account_key and
+  // slack_webhook_url are omitted at the list level; callers that need them
+  // fetch the full record via getClientGoogleCredentials/getClientSlackCredentials.
   const rows = await solApiFetch<
-    (Omit<ClientRecord, "google_service_account_key"> & {
+    (Omit<ClientRecord, "google_service_account_key" | "slack_webhook_url"> & {
       google_service_account_key?: string | null;
+      slack_webhook_url?: string | null;
     })[]
   >(`/v1/clients${qs ? `?${qs}` : ""}`);
 
   return rows.map((row) => ({
     ...row,
     google_service_account_key: row.google_service_account_key ?? null,
+    slack_webhook_url: row.slack_webhook_url ?? null,
   }));
 }
 

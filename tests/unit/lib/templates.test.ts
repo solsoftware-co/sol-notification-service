@@ -78,6 +78,7 @@ const mockClient: ClientRecord = {
   created_at: new Date(),
   google_service_account_email: null,
   google_service_account_key: null,
+  slack_webhook_url: null,
 };
 
 const mockPeriod: ResolvedPeriod = {
@@ -103,7 +104,6 @@ const mockReport: AnalyticsReport = {
     { date: '2026-02-16', sessions: 680, activeUsers: 450, newUsers: 80 },
   ],
   resolvedPeriod: mockPeriod,
-  isMock: false,
 };
 
 // ---------------------------------------------------------------------------

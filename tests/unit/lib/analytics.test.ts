@@ -65,26 +65,24 @@ describe("getAnalyticsReport", () => {
   });
 
   // -------------------------------------------------------------------------
-  it("returns mock data with isMock:true when credentialsJson is null", async () => {
-    const report = await getAnalyticsReport("123456789", mockPeriod, null);
+  it("returns undefined when propertyId is missing", async () => {
+    const report = await getAnalyticsReport(mockPeriod, null, MOCK_CREDENTIALS);
 
-    expect(report.isMock).toBe(true);
-    expect(report.sessions).toBeGreaterThan(0);
-    expect(report.resolvedPeriod).toEqual(mockPeriod);
+    expect(report).toBeUndefined();
+    expect(BetaAnalyticsDataClient).not.toHaveBeenCalled();
+    expect(mockRunReport).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined when credentialsJson is missing", async () => {
+    const report = await getAnalyticsReport(mockPeriod, "123456789", null);
+
+    expect(report).toBeUndefined();
     expect(BetaAnalyticsDataClient).not.toHaveBeenCalled();
     expect(mockRunReport).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
-  it("returns mock data when propertyId is falsy (even with credentials)", async () => {
-    const report = await getAnalyticsReport("", mockPeriod, MOCK_CREDENTIALS);
-
-    expect(report.isMock).toBe(true);
-    expect(BetaAnalyticsDataClient).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------------------------
-  it("live mode — calls all 4 runReport variants and returns parsed AnalyticsReport", async () => {
+  it("calls all 4 runReport variants and returns parsed AnalyticsReport", async () => {
     // Daily report: 2 rows, metrics: sessions / activeUsers / newUsers
     const dailyResponse = {
       rows: [
@@ -128,9 +126,8 @@ describe("getAnalyticsReport", () => {
       .mockResolvedValueOnce([priorTotalsResponse])    // call 9
       .mockResolvedValueOnce([priorDurationResponse]); // call 10
 
-    const report = await getAnalyticsReport("123456789", mockPeriod, MOCK_CREDENTIALS);
+    const report = await getAnalyticsReport(mockPeriod, "123456789", MOCK_CREDENTIALS);
 
-    expect(report.isMock).toBe(false);
     expect(report.sessions).toBe(25);       // 10 + 15
     expect(report.activeUsers).toBe(20);    // 8 + 12
     expect(report.newUsers).toBe(10);       // 4 + 6
@@ -157,7 +154,7 @@ describe("getAnalyticsReport", () => {
       .mockResolvedValueOnce([emptyResponse])
       .mockResolvedValueOnce([emptyResponse]);
 
-    const report = await getAnalyticsReport("123456789", mockPeriod, MOCK_CREDENTIALS);
+    const report = await getAnalyticsReport(mockPeriod, "123456789", MOCK_CREDENTIALS);
 
     expect(report.sessions).toBe(0);
     expect(report.activeUsers).toBe(0);
@@ -166,7 +163,6 @@ describe("getAnalyticsReport", () => {
     expect(report.topPages).toEqual([]);
     expect(report.topSources).toEqual([]);
     expect(report.dailyMetrics).toEqual([]);
-    expect(report.isMock).toBe(false);
   });
 
   // -------------------------------------------------------------------------
@@ -175,7 +171,7 @@ describe("getAnalyticsReport", () => {
     const emptyResponse = { rows: [] };
     mockRunReport.mockResolvedValue([emptyResponse]);
 
-    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_week" }, MOCK_CREDENTIALS);
+    await getAnalyticsReport({ ...mockPeriod, preset: "last_week" }, "123456789", MOCK_CREDENTIALS);
 
     const sourcesCall = mockRunReport.mock.calls[2][0];
     const pagesCall   = mockRunReport.mock.calls[3][0];
@@ -187,7 +183,7 @@ describe("getAnalyticsReport", () => {
     const emptyResponse = { rows: [] };
     mockRunReport.mockResolvedValue([emptyResponse]);
 
-    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_month" }, MOCK_CREDENTIALS);
+    await getAnalyticsReport({ ...mockPeriod, preset: "last_month" }, "123456789", MOCK_CREDENTIALS);
 
     const sourcesCall = mockRunReport.mock.calls[2][0];
     const pagesCall   = mockRunReport.mock.calls[3][0];
@@ -199,7 +195,7 @@ describe("getAnalyticsReport", () => {
     const emptyResponse = { rows: [] };
     mockRunReport.mockResolvedValue([emptyResponse]);
 
-    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_30_days" }, MOCK_CREDENTIALS);
+    await getAnalyticsReport({ ...mockPeriod, preset: "last_30_days" }, "123456789", MOCK_CREDENTIALS);
 
     const sourcesCall = mockRunReport.mock.calls[2][0];
     const pagesCall   = mockRunReport.mock.calls[3][0];
@@ -213,7 +209,7 @@ describe("getAnalyticsReport", () => {
     const emptyResponse = { rows: [] };
     mockRunReport.mockResolvedValue([emptyResponse]);
 
-    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_week" }, MOCK_CREDENTIALS, { topSourcesLimit: 15 });
+    await getAnalyticsReport({ ...mockPeriod, preset: "last_week" }, "123456789", MOCK_CREDENTIALS, { topSourcesLimit: 15 });
 
     const sourcesCall = mockRunReport.mock.calls[2][0];
     const pagesCall   = mockRunReport.mock.calls[3][0];
@@ -225,7 +221,7 @@ describe("getAnalyticsReport", () => {
     const emptyResponse = { rows: [] };
     mockRunReport.mockResolvedValue([emptyResponse]);
 
-    await getAnalyticsReport("123456789", { ...mockPeriod, preset: "last_month" }, MOCK_CREDENTIALS, { topPagesLimit: 3 });
+    await getAnalyticsReport({ ...mockPeriod, preset: "last_month" }, "123456789", MOCK_CREDENTIALS, { topPagesLimit: 3 });
 
     const sourcesCall = mockRunReport.mock.calls[2][0];
     const pagesCall   = mockRunReport.mock.calls[3][0];
@@ -236,21 +232,7 @@ describe("getAnalyticsReport", () => {
   // -------------------------------------------------------------------------
   // historicalPeriods
   describe("historicalPeriods", () => {
-    it("mock mode — returns 3 pre-defined historical period entries", async () => {
-      const report = await getAnalyticsReport("123456789", mockPeriod, null);
-
-      expect(report.isMock).toBe(true);
-      expect(report.historicalPeriods).toHaveLength(3);
-      report.historicalPeriods!.forEach((h) => {
-        expect(h).toHaveProperty("periodLabel");
-        expect(h).toHaveProperty("sessions");
-        expect(h).toHaveProperty("activeUsers");
-        expect(h).toHaveProperty("newUsers");
-        expect(h).toHaveProperty("avgSessionDurationSecs");
-      });
-    });
-
-    it("live mode — historicalPeriods contains summaries for all 3 prior periods", async () => {
+    it("historicalPeriods contains summaries for all 3 prior periods", async () => {
       const emptyMain = { rows: [] };
       const priorTotals = { rows: [makeRow([], ["5000", "3500", "600"])] };
       const priorDuration = { rows: [makeRow([], ["175"])] };
@@ -267,9 +249,8 @@ describe("getAnalyticsReport", () => {
         .mockResolvedValueOnce([priorTotals])
         .mockResolvedValueOnce([priorDuration]);
 
-      const report = await getAnalyticsReport("123456789", mockPeriod, MOCK_CREDENTIALS);
+      const report = await getAnalyticsReport(mockPeriod, "123456789", MOCK_CREDENTIALS);
 
-      expect(report.isMock).toBe(false);
       expect(report.historicalPeriods).toHaveLength(3);
       expect(report.historicalPeriods![0].sessions).toBe(5000);
       expect(report.historicalPeriods![0].activeUsers).toBe(3500);
@@ -279,7 +260,7 @@ describe("getAnalyticsReport", () => {
       expect(report.historicalPeriods![0].periodLabel.length).toBeGreaterThan(0);
     });
 
-    it("live mode — a failed prior period fetch is gracefully excluded", async () => {
+    it("a failed prior period fetch is gracefully excluded", async () => {
       const emptyMain = { rows: [] };
       const priorTotals = { rows: [makeRow([], ["4000", "2800", "500"])] };
       const priorDuration = { rows: [makeRow([], ["160"])] };
@@ -296,19 +277,18 @@ describe("getAnalyticsReport", () => {
         .mockResolvedValueOnce([priorTotals])
         .mockResolvedValueOnce([priorDuration]);
 
-      const report = await getAnalyticsReport("123456789", mockPeriod, MOCK_CREDENTIALS);
+      const report = await getAnalyticsReport(mockPeriod, "123456789", MOCK_CREDENTIALS);
 
       expect(report.historicalPeriods).toHaveLength(2);
-      expect(report.isMock).toBe(false);
     });
   });
 
   // -------------------------------------------------------------------------
-  it("live mode — SDK error propagates and is not swallowed", async () => {
+  it("SDK error propagates and is not swallowed", async () => {
     mockRunReport.mockRejectedValue(new Error("GA4 API unavailable"));
 
     await expect(
-      getAnalyticsReport("123456789", mockPeriod, MOCK_CREDENTIALS)
+      getAnalyticsReport(mockPeriod, "123456789", MOCK_CREDENTIALS)
     ).rejects.toThrow("GA4 API unavailable");
   });
 });

@@ -25,7 +25,7 @@ export const FLOW_MAP: Record<string, FlowConfig> = {
     ],
     event: "analytics/report.requested",
     eventData: {
-      clientId: "client-acme",
+      clientId: "sol",
       reportPeriod: { preset: "last_week" },
       scheduledAt: new Date().toISOString(),
     },
@@ -36,7 +36,7 @@ export const FLOW_MAP: Record<string, FlowConfig> = {
     patterns: ["src/inngest/functions/form-notification.ts"],
     event: "form/submitted",
     eventData: {
-      clientId: "client-acme",
+      clientId: "sol",
       submitterName: "E2E Test User",
       submitterEmail: "e2e-test@example.com",
       submitterMessage: "This is an automated e2e test submission.",

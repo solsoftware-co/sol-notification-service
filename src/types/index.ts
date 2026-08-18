@@ -85,7 +85,6 @@ export interface AnalyticsReport {
   topSources: TrafficSource[];
   dailyMetrics: DailyMetric[];
   resolvedPeriod: ResolvedPeriod;
-  isMock: boolean;
   historicalPeriods?: HistoricalPeriodSnapshot[]; // up to 3 prior periods, oldest first
 }
 
@@ -120,19 +119,23 @@ export interface ClientRecord {
   created_at: Date | string; // Date from DB; Inngest step serialization yields string
   google_service_account_email: string | null;
   google_service_account_key: string | null;
+  slack_webhook_url: string | null;
   timezone: SupportedTimezone;
 }
 
 /**
- * ClientRecord without the Google service-account credential. Steps that only
- * need identity/config fields (recipients, rendering, timezone resolution)
- * should be typed on this, not ClientRecord, so the credential can't leak into
+ * ClientRecord without the credential fields. Steps that only need
+ * identity/config fields (recipients, rendering, timezone resolution)
+ * should be typed on this, not ClientRecord, so a credential can't leak into
  * a step's persisted output via those code paths.
  */
-export type ClientSummary = Omit<ClientRecord, "google_service_account_key">;
+export type ClientSummary = Omit<ClientRecord, "google_service_account_key" | "slack_webhook_url">;
 
 /** The Google service-account credential, fetched separately via getClientGoogleCredentials(). */
 export type ClientGoogleCredentials = Pick<ClientRecord, "google_service_account_key">;
+
+/** The Slack incoming-webhook URL, fetched separately via getClientSlackCredentials(). */
+export type ClientSlackCredentials = Pick<ClientRecord, "slack_webhook_url">;
 
 export interface NotificationLogRow {
   id: number;
@@ -153,7 +156,8 @@ export interface NotificationLogEntry {
   workflow: string;
   event_name: string;
   outcome: "sent" | "failed" | "skipped";
-  recipient_email: string;
+  /** Email-shaped workflows populate this; non-email channels (e.g. Slack) omit it. */
+  recipient_email?: string | null;
   subject: string;
   resend_id?: string;
   error_message?: string;
@@ -194,6 +198,15 @@ export interface EmailResult {
 export interface BaseEventPayload {
   clientId: string;
 }
+
+export interface SlackMessageRequestedPayload extends BaseEventPayload {
+  text: string;
+  /** Optional Slack Block Kit blocks for richer formatting — passed through as-is. */
+  blocks?: Record<string, unknown>[];
+}
+
+/** Body posted to a client's Slack incoming webhook — everything from the event except clientId, which Slack has no notion of. */
+export type SlackMessageRequest = Pick<SlackMessageRequestedPayload, "text" | "blocks">;
 
 /** Manual trigger payload for analytics/monthly.scheduled — no required fields. */
 export interface MonthlyScheduledPayload {}

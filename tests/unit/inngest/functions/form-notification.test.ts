@@ -76,6 +76,7 @@ const mockClient: ClientRecord = {
   created_at: new Date(),
   google_service_account_email: null,
   google_service_account_key: null,
+  slack_webhook_url: null,
 };
 
 const mockEmailResult: EmailResult = {
@@ -127,6 +128,7 @@ function freshEngine() {
 beforeEach(() => {
   vi.resetAllMocks();
   (config as any).emailMode = "mock"; // reset to default before each test
+  (config as any).env = "development"; // reset to default before each test
   vi.mocked(getClientGoogleCredentials).mockResolvedValue({
     google_service_account_key: mockClient.google_service_account_key,
   });
@@ -322,12 +324,13 @@ describe("full execute", () => {
 });
 
 // ---------------------------------------------------------------------------
-// T009: log-result step — writeNotificationLog guard
+// T009: log-result step — always writes to notification_logs, regardless of
+// environment. Each environment's SOL_API_URL already points at its own
+// isolated sol-api deployment, so there's no shared audit trail to guard.
 // ---------------------------------------------------------------------------
 
-describe("log-result — emailMode live", () => {
+describe("log-result", () => {
   it("calls writeNotificationLog with correct fields and formData metadata", async () => {
-    (config as any).emailMode = "live";
     vi.mocked(getClientById).mockResolvedValue(mockClient);
     vi.mocked(sendEmail).mockResolvedValue(mockLiveEmailResult);
 
@@ -349,28 +352,62 @@ describe("log-result — emailMode live", () => {
       })
     );
   });
-});
 
-describe("log-result — emailMode mock", () => {
-  it("does not call writeNotificationLog", async () => {
+  it("still calls writeNotificationLog in non-production environments", async () => {
+    (config as any).env = "preview";
     vi.mocked(getClientById).mockResolvedValue(mockClient);
     vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
 
     await t.execute();
 
-    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
   });
 });
 
-describe("log-result — emailMode test", () => {
-  it("does not call writeNotificationLog", async () => {
-    (config as any).emailMode = "test";
-    vi.mocked(getClientById).mockResolvedValue(mockClient);
-    vi.mocked(sendEmail).mockResolvedValue(mockEmailResult);
+// ---------------------------------------------------------------------------
+// onFailure — fires after retries are exhausted
+// ---------------------------------------------------------------------------
 
-    await t.execute();
+function fakeFailureArgs(overrides?: Partial<typeof validEvent.data>) {
+  return {
+    event: {
+      data: {
+        run_id: "run-exhausted-1",
+        function_id: "send-form-notification",
+        event: { data: { ...validEvent.data, ...overrides } },
+        error: { name: "Error", message: "Resend unavailable" },
+      },
+    },
+    error: new Error("Resend unavailable"),
+    step: { run: async (_id: string, fn: () => unknown) => fn() },
+  };
+}
 
-    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
+describe("onFailure", () => {
+  it("writes a failed notification log", async () => {
+    const onFailure = (sendFormNotification as any).onFailureFn;
+
+    await onFailure(fakeFailureArgs());
+
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
+    expect(mockWriteNotificationLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client_id: "client-acme",
+        workflow: "send-form-notification",
+        event_name: "form/submitted",
+        outcome: "failed",
+        error_message: "Resend unavailable",
+      })
+    );
+  });
+
+  it("writes the failed log regardless of environment", async () => {
+    (config as any).env = "preview";
+    const onFailure = (sendFormNotification as any).onFailureFn;
+
+    await onFailure(fakeFailureArgs());
+
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
   });
 });
 
