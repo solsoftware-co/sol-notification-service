@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.7...v1.2.0) (2026-08-18)
+
+
+### Features
+
+* add Slack notification workflow, remove environment branching from notification logic ([2f32ac2](https://github.com/solsoftware-co/sol-notification-service/commit/2f32ac24f12b6a95a624890a1c6cf6a54c6f7e54))
+
 ## [1.1.7](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.6...v1.1.7) (2026-08-16)
 
 
