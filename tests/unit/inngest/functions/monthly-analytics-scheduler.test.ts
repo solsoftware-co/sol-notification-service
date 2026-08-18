@@ -44,6 +44,7 @@ function makeClient(id: string, email: string): ClientRecord {
     created_at: new Date(),
     google_service_account_email: null,
     google_service_account_key: null,
+    slack_webhook_url: null,
     timezone: "America/Chicago",
   };
 }

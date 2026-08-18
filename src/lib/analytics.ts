@@ -13,11 +13,11 @@ import type {
 // Default row limits per reporting preset.
 // Weekly = quick snapshot; monthly/longer = comprehensive view.
 const PRESET_LIMITS: Record<ReportPeriodPreset, { sources: number; pages: number }> = {
-  last_week:    { sources: 5,  pages: 5  },
-  last_month:   { sources: 10, pages: 20 },
+  last_week: { sources: 5, pages: 5 },
+  last_month: { sources: 10, pages: 20 },
   last_30_days: { sources: 10, pages: 20 },
   last_90_days: { sources: 10, pages: 20 },
-  custom:       { sources: 10, pages: 10 },
+  custom: { sources: 10, pages: 10 },
 };
 
 export interface AnalyticsReportOptions {
@@ -199,44 +199,15 @@ async function getPeriodTotals(
   };
 }
 
-function mockReport(period: ResolvedPeriod): AnalyticsReport {
-  return {
-    sessions: 42,
-    activeUsers: 31,
-    newUsers: 18,
-    avgSessionDurationSecs: 154,
-    topPages: [
-      { path: "/", views: 120 },
-      { path: "/about", views: 45 },
-      { path: "/contact", views: 30 },
-    ],
-    topSources: [
-      { source: "google", sessions: 20 },
-      { source: "direct", sessions: 15 },
-      { source: "(none)", sessions: 7 },
-    ],
-    dailyMetrics: [
-      { date: period.start, sessions: 6, activeUsers: 5, newUsers: 3 },
-    ],
-    resolvedPeriod: period,
-    isMock: true,
-    historicalPeriods: [
-      { periodLabel: 'Feb 2',  periodStart: '2026-02-02', sessions: 35, activeUsers: 26, newUsers: 14, avgSessionDurationSecs: 142 },
-      { periodLabel: 'Feb 9',  periodStart: '2026-02-09', sessions: 48, activeUsers: 35, newUsers: 21, avgSessionDurationSecs: 138 },
-      { periodLabel: 'Feb 16', periodStart: '2026-02-16', sessions: 39, activeUsers: 29, newUsers: 16, avgSessionDurationSecs: 161 },
-    ],
-  };
-}
-
 export async function getAnalyticsReport(
-  propertyId: string,
   period: ResolvedPeriod,
+  propertyId: string | null,
   credentialsJson: string | null,
   options: AnalyticsReportOptions = {}
-): Promise<AnalyticsReport> {
+): Promise<AnalyticsReport | undefined> {
   if (!credentialsJson || !propertyId) {
-    log(`GA4 not configured for property ${propertyId || "(none)"} — returning mock data`);
-    return mockReport(period);
+    log(`GA4 not configured for property ${propertyId || "(none)"}`);
+    return;
   }
 
   const defaults = PRESET_LIMITS[period.preset];
@@ -306,7 +277,6 @@ export async function getAnalyticsReport(
     topSources,
     dailyMetrics,
     resolvedPeriod: period,
-    isMock: false,
     historicalPeriods,
   };
 }

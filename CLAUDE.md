@@ -47,8 +47,9 @@ src/
 │   └── index.ts                    # All shared TypeScript types and event payload interfaces
 ├── lib/
 │   ├── config.ts                   # Environment config singleton (single source of truth)
-│   ├── sol-api.ts                  # sol-api HTTP client — getClientById(), getAllActiveClients(), writeNotificationLog(), checkSolApiConnection()
+│   ├── sol-api.ts                  # sol-api HTTP client — getClientById(), getAllActiveClients(), getClientGoogleCredentials(), getClientSlackCredentials(), writeNotificationLog(), checkSolApiConnection()
 │   ├── analytics.ts                # GA4 Data API wrapper — getAnalyticsReport(), mock/live routing
+│   ├── slack.ts                    # postSlackMessage() — posts to a client's Slack incoming webhook, throws on failure
 │   └── email.ts                    # Email abstraction (mock/test/live routing)
 ├── utils/
 │   ├── logger.ts                   # Pino logger — exports log(), logError(), flush(). Never import pino directly.
@@ -62,7 +63,8 @@ src/
         ├── template.ts             # Canonical workflow template — copy, do not register
         ├── hello-world.ts          # Example stub function
         ├── weekly-analytics-scheduler.ts  # Cron (Tue 09:00 UTC) + manual trigger; fans out per-client events
-        └── weekly-analytics-report.ts     # Per-client worker: fetch GA4 data, build + send email
+        ├── weekly-analytics-report.ts     # Per-client worker: fetch GA4 data, build + send email
+        └── slack-notification.ts          # sendSlackMessage — posts to a client's Slack incoming webhook, skips if unconfigured
 
 scripts/
 └── test-email-preview.ts           # Trigger mock email preview (npm run email:preview)
@@ -103,6 +105,8 @@ When adding a new Inngest email workflow, register it in the e2e test suite — 
 Run locally with: `PREVIEW_URL=<url> INNGEST_EVENT_KEY_STAGING=<key> ... npm run test:e2e`
 
 ## Recent Changes
+- 028-slack-notifications: Added `sendSlackMessage` (event `slack/message.requested`) — posts to a client's Slack incoming webhook (`clients.slack_webhook_url`, fetched via `getClientSlackCredentials()`, same scoped-credential pattern as Google). Skips gracefully if unconfigured. Added `onFailure` handlers to `sendFormNotification`, `sendAnalyticsReport`, and `sendSlackMessage` so terminal failures (retries exhausted) still get logged. `NotificationLogEntry.recipient_email` is now optional/nullable to support non-email channels.
+  Removed `config.env`/`config.emailMode` branching from all workflow business logic in favor of data-driven checks — each environment's `SOL_API_URL` already points at its own isolated sol-api deployment, so there's no shared state for an environment check to protect. `writeNotificationLog` now always runs (no more prod-only gate); Google Sheets sync gates purely on credential presence; the analytics `fetch-analytics-data` step gates purely on `ga4_property_id`/credential presence (merged from the old separate `check-ga4-config` step, which only checked the property ID — a client with a property ID but no/broken credentials used to silently get a fabricated mock report emailed to them in production; now it skips and logs, like the missing-property-id case always did). `analytics.ts`'s `mockReport()`/`isMock` fallback is removed entirely. `getAnalyticsReport(period, propertyId: string | null, credentialsJson: string | null, options?)` — note the reordered params, typed nullable rather than optional to match `ClientRecord`'s own `string | null` fields — centralizes the "is this client configured" check inside the function itself (returns `undefined` rather than proceeding); `fetch-analytics-data` treats that `undefined` as its skip signal rather than pre-checking the client's fields itself, though it still inspects `client.ga4_property_id` after the fact purely to write a specific reason into the skip's audit-log entry. Local/preview/staging environments accordingly need real GA4 credentials seeded to exercise this workflow past `fetch-analytics-data` — tracked as follow-up infra work (Neon Local in `sol-tooling`, blocked on a `NEON_API_KEY`). `npm run email:preview` is unaffected — it calls the template renderer directly and never touches this code path. The scheduler fan-out throttle (`config.env !== "production" ? 1 : undefined` in `weekly-/monthly-analytics-scheduler.ts`) and the logger's transport selection (`isDev` in `logger.ts`) are the only `config.env` branches left — both are blast-radius/observability concerns, not data-completeness gaps, so they weren't touched.
 - 027-sol-api-client-migration: Removed all direct database access (`@neondatabase/serverless`, `ws`, `pg`, `db/migrations/`, `scripts/migrate.ts`, `scripts/setup-db.ts`, `scripts/seed-data.ts`). `src/lib/db.ts` renamed to `src/lib/sol-api.ts` — a `fetch`-based sol-api HTTP client. `DATABASE_URL` replaced by `SOL_API_URL`/`SOL_API_KEY`. Removed the `testOnly` email-filter safety net from the analytics schedulers — non-prod environments now hit sol-api's isolated staging deployment instead, so environment separation is real rather than filtered-by-convention.
 - 023-improve-function-logging: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `pino ^9.x`, `@logtail/pino ^3.x` — all existing; zero new packages
 - 022-client-timezone: Added TypeScript 5.x / Node.js 20+ + `inngest ^3.x`, `@neondatabase/serverless ^1.x` — no new packages required

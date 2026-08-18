@@ -15,6 +15,7 @@ vi.stubGlobal("fetch", mockFetch);
 // Imports after mocks
 import {
   getClientById,
+  getClientSlackCredentials,
   getAllActiveClients,
   writeNotificationLog,
 } from "../../../src/lib/sol-api";
@@ -46,6 +47,7 @@ const mockClientRecord: ClientRecord = {
   created_at: "2024-01-01T00:00:00.000Z",
   google_service_account_email: null,
   google_service_account_key: null,
+  slack_webhook_url: null,
   timezone: "America/Chicago",
 };
 
@@ -93,6 +95,23 @@ describe("getClientById", () => {
 });
 
 // ---------------------------------------------------------------------------
+describe("getClientSlackCredentials", () => {
+  it("fetches with ?include=slack_credentials and returns the webhook url", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse(envelope({ slack_webhook_url: "https://hooks.slack.com/services/xyz" }))
+    );
+
+    const result = await getClientSlackCredentials("client-acme");
+
+    expect(result).toEqual({ slack_webhook_url: "https://hooks.slack.com/services/xyz" });
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe(
+      "https://sol-api-staging.solsoftware.workers.dev/v1/clients/client-acme?include=slack_credentials"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe("getAllActiveClients", () => {
   it("appends limit as a query param when provided", async () => {
     mockFetch.mockResolvedValue(jsonResponse(envelope([mockClientRecord])));
@@ -116,13 +135,14 @@ describe("getAllActiveClients", () => {
     );
   });
 
-  it("defaults a missing google_service_account_key to null (list responses omit it)", async () => {
-    const { google_service_account_key: _omit, ...summary } = mockClientRecord;
+  it("defaults missing google_service_account_key and slack_webhook_url to null (list responses omit them)", async () => {
+    const { google_service_account_key: _omit1, slack_webhook_url: _omit2, ...summary } = mockClientRecord;
     mockFetch.mockResolvedValue(jsonResponse(envelope([summary])));
 
     const [result] = await getAllActiveClients();
 
     expect(result.google_service_account_key).toBeNull();
+    expect(result.slack_webhook_url).toBeNull();
   });
 });
 

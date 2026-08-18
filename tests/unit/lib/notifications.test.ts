@@ -25,6 +25,7 @@ function makeClient(overrides: Partial<ClientRecord> = {}): ClientRecord {
     created_at: new Date(),
     google_service_account_email: null,
     google_service_account_key: null,
+    slack_webhook_url: null,
     ...overrides,
   };
 }

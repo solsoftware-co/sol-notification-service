@@ -45,7 +45,6 @@ const mockReport: AnalyticsReport = {
     { date: '2026-02-17', sessions: 710, activeUsers: 470, newUsers: 85 },
   ],
   resolvedPeriod: mockPeriod,
-  isMock: true,
 };
 
 const mockReportWithHistory: AnalyticsReport = {

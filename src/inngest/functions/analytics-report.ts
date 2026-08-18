@@ -1,11 +1,10 @@
 import { inngest } from "../client";
-import { config } from "../../lib/config";
 import { getClientById, getClientGoogleCredentials, writeNotificationLog } from "../../lib/sol-api";
 import { getAnalyticsReport } from "../../lib/analytics";
 import { sendEmail } from "../../lib/email";
 import { resolveRecipients } from "../../lib/notifications";
 import { renderAnalyticsReportEmail, buildReportTitle } from "../../lib/templates";
-import { log, setRunContext } from "../../utils/logger";
+import { log, logError, setRunContext } from "../../utils/logger";
 import { next9amInTimezone, isNonHolidayWeekdayInTz } from "../../utils/timezone";
 import type {
   AnalyticsReportRequestedPayload,
@@ -103,6 +102,24 @@ export const sendAnalyticsReport = inngest.createFunction(
   {
     id: "send-analytics-report",
     retries: 3,
+    onFailure: async ({ event, error, step }) => {
+      const originalData = event.data.event.data as AnalyticsReportRequestedPayload;
+      const clientId = originalData.clientId;
+      setRunContext({ runId: event.data.run_id, clientId });
+      logError(`Analytics report permanently failed for client ${clientId}`, error);
+
+      await step.run("log-terminal-failure", async () => {
+        await writeNotificationLog({
+          client_id: clientId,
+          workflow: "send-analytics-report",
+          event_name: "analytics/report.requested",
+          outcome: "failed",
+          subject: buildReportTitle(originalData.reportPeriod.preset),
+          error_message: error.message,
+          metadata: { period_preset: originalData.reportPeriod.preset },
+        });
+      });
+    },
   },
   { event: "analytics/report.requested" },
   async ({ event, step, runId }) => {
@@ -143,10 +160,32 @@ export const sendAnalyticsReport = inngest.createFunction(
       await step.sleepUntil("wait-for-send-window", sendTime);
     }
 
-    const skipped = await step.run("check-ga4-config", async () => {
-      // Only skip in live mode — in test/mailtrap/mock modes, analytics.ts returns
-      // mock data when GA4_SERVICE_ACCOUNT_JSON is absent, so the email can still send.
-      if (!client.ga4_property_id && config.emailMode === "live") {
+    const resolvedPeriod = await step.run("resolve-report-period", async () => {
+      return resolvePeriod(data.reportPeriod, data.scheduledAt);
+    });
+
+    const fetchResult = await step.run("fetch-analytics-data", async () => {
+      setRunContext({ runId, clientId });
+      const { google_service_account_key } = await getClientGoogleCredentials(clientId);
+
+      const report = await getAnalyticsReport(
+        resolvedPeriod,
+        client.ga4_property_id,
+        google_service_account_key,
+        {
+          topSourcesLimit: data.topSourcesLimit,
+          topPagesLimit: data.topPagesLimit,
+        }
+      );
+
+      // getAnalyticsReport() is the single source of truth for "is this client
+      // configured" — it returns undefined rather than proceeding. The reason
+      // text below is just descriptive detail for the audit log, not a second
+      // gate: by the time we're here, the decision not to proceed already happened.
+      if (!report) {
+        const reason = !client.ga4_property_id
+          ? "Client has no GA4 property configured"
+          : "Client has no Google credentials configured";
         await writeNotificationLog({
           client_id: clientId,
           workflow: "send-analytics-report",
@@ -154,38 +193,20 @@ export const sendAnalyticsReport = inngest.createFunction(
           outcome: "skipped",
           recipient_email: client.email,
           subject: buildReportTitle(data.reportPeriod.preset),
-          error_message: "Client has no GA4 property configured",
+          error_message: reason,
           metadata: {},
         });
-        return true;
+        return { skipped: true as const };
       }
-      return false;
+
+      log(`Analytics report started for client ${clientId} — period: ${resolvedPeriod.preset} (${resolvedPeriod.label})`);
+      return { skipped: false as const, report };
     });
 
-    if (skipped) {
+    if (fetchResult.skipped) {
       return { clientId, outcome: "skipped" };
     }
-
-    const resolvedPeriod = await step.run("resolve-report-period", async () => {
-      return resolvePeriod(data.reportPeriod, data.scheduledAt);
-    });
-
-    log(`Analytics report started for client ${clientId} — period: ${resolvedPeriod.preset} (${resolvedPeriod.label})`);
-
-    const report = await step.run("fetch-analytics-data", async () => {
-      setRunContext({ runId, clientId });
-      log(`Querying GA4 property ${client.ga4_property_id ?? "(none)"} for client ${clientId}`);
-      const { google_service_account_key } = await getClientGoogleCredentials(clientId);
-      return getAnalyticsReport(
-        client.ga4_property_id!,
-        resolvedPeriod,
-        google_service_account_key,
-        {
-          topSourcesLimit: data.topSourcesLimit,
-          topPagesLimit: data.topPagesLimit,
-        }
-      );
-    });
+    const report = fetchResult.report;
 
     const result = await step.run("send-email", async () => {
       setRunContext({ runId, clientId });
@@ -207,27 +228,25 @@ export const sendAnalyticsReport = inngest.createFunction(
       const emailResult = result as typeof result & { banner?: ClientBannerConfig };
       const sentTo = Array.isArray(emailResult.originalTo) ? emailResult.originalTo.join(", ") : emailResult.originalTo;
       log(`Analytics report sent to ${sentTo} — outcome: ${emailResult.outcome}`);
-      if (config.emailMode === "live") {
-        const recipientEmail = Array.isArray(emailResult.originalTo)
-          ? emailResult.originalTo.join(", ")
-          : emailResult.originalTo;
-        await writeNotificationLog({
-          client_id: clientId,
-          workflow: "send-analytics-report",
-          event_name: "analytics/report.requested",
-          outcome: emailResult.outcome === "sent" ? "sent" : "failed",
-          recipient_email: recipientEmail,
-          subject: emailResult.subject,
-          resend_id: emailResult.resendId,
-          metadata: {
-            ga4_property_id: client.ga4_property_id,
-            period_preset: data.reportPeriod.preset,
-            date_range_start: resolvedPeriod.start,
-            date_range_end: resolvedPeriod.end,
-            ...(emailResult.banner ? { banner: emailResult.banner } : {}),
-          },
-        });
-      }
+      const recipientEmail = Array.isArray(emailResult.originalTo)
+        ? emailResult.originalTo.join(", ")
+        : emailResult.originalTo;
+      await writeNotificationLog({
+        client_id: clientId,
+        workflow: "send-analytics-report",
+        event_name: "analytics/report.requested",
+        outcome: emailResult.outcome === "sent" ? "sent" : "failed",
+        recipient_email: recipientEmail,
+        subject: emailResult.subject,
+        resend_id: emailResult.resendId,
+        metadata: {
+          ga4_property_id: client.ga4_property_id,
+          period_preset: data.reportPeriod.preset,
+          date_range_start: resolvedPeriod.start,
+          date_range_end: resolvedPeriod.end,
+          ...(emailResult.banner ? { banner: emailResult.banner } : {}),
+        },
+      });
     });
 
     return {
@@ -235,7 +254,6 @@ export const sendAnalyticsReport = inngest.createFunction(
       preset: data.reportPeriod.preset,
       resolvedPeriod,
       outcome: result.outcome,
-      isMock: report.isMock,
     };
   }
 );

@@ -1,11 +1,10 @@
 import { inngest } from "../client";
-import { config } from "../../lib/config";
 import { getClientById, getClientGoogleCredentials, writeNotificationLog } from "../../lib/sol-api";
 import { sendEmail } from "../../lib/email";
 import { appendSheetRow } from "../../lib/sheets";
 import { resolveRecipients } from "../../lib/notifications";
 import { renderFormNotificationEmail } from "../../lib/templates";
-import { log, setRunContext } from "../../utils/logger";
+import { log, logError, setRunContext } from "../../utils/logger";
 import type { FormSubmittedPayload, EmailResult, ClientBannerConfig } from "../../types/index";
 
 const REQUIRED_FIELDS: (keyof FormSubmittedPayload)[] = [
@@ -38,6 +37,24 @@ export const sendFormNotification = inngest.createFunction(
   {
     id: "send-form-notification",
     retries: 3,
+    onFailure: async ({ event, error, step }) => {
+      const originalData = event.data.event.data as FormSubmittedPayload;
+      const clientId = originalData.clientId;
+      setRunContext({ runId: event.data.run_id, clientId });
+      logError(`Form notification permanently failed for client ${clientId}`, error);
+
+      await step.run("log-terminal-failure", async () => {
+        await writeNotificationLog({
+          client_id: clientId,
+          workflow: "send-form-notification",
+          event_name: "form/submitted",
+          outcome: "failed",
+          subject: originalData.formName ?? "Form notification",
+          error_message: error.message,
+          metadata: { formData: originalData },
+        });
+      });
+    },
   },
   { event: "form/submitted" },
   async ({ event, step, runId }) => {
@@ -85,9 +102,6 @@ export const sendFormNotification = inngest.createFunction(
       if (!data.sheetsDestination) {
         return { skipped: true, reason: "no destination in payload" };
       }
-      if (config.emailMode !== "live") {
-        return { skipped: true, reason: "non-live mode" };
-      }
       const { google_service_account_key } = await getClientGoogleCredentials(clientId);
       if (!google_service_account_key) {
         return { skipped: true, reason: "no credentials on client" };
@@ -111,21 +125,19 @@ export const sendFormNotification = inngest.createFunction(
       const emailResult = result as EmailResult & { banner?: ClientBannerConfig };
       const sentTo = Array.isArray(emailResult.originalTo) ? emailResult.originalTo.join(", ") : emailResult.originalTo;
       log(`Form notification sent to ${sentTo} — outcome: ${emailResult.outcome}`);
-      if (config.emailMode === "live") {
-        const recipientEmail = Array.isArray(emailResult.originalTo)
-          ? emailResult.originalTo.join(", ")
-          : emailResult.originalTo;
-        await writeNotificationLog({
-          client_id: clientId,
-          workflow: "send-form-notification",
-          event_name: "form/submitted",
-          outcome: emailResult.outcome === "sent" ? "sent" : "failed",
-          recipient_email: recipientEmail,
-          subject: emailResult.subject,
-          resend_id: emailResult.resendId,
-          metadata: { formData: data, sheets_outcome: sheetsOutcome, recipient_source: recipientSource, ...(emailResult.banner ? { banner: emailResult.banner } : {}) },
-        });
-      }
+      const recipientEmail = Array.isArray(emailResult.originalTo)
+        ? emailResult.originalTo.join(", ")
+        : emailResult.originalTo;
+      await writeNotificationLog({
+        client_id: clientId,
+        workflow: "send-form-notification",
+        event_name: "form/submitted",
+        outcome: emailResult.outcome === "sent" ? "sent" : "failed",
+        recipient_email: recipientEmail,
+        subject: emailResult.subject,
+        resend_id: emailResult.resendId,
+        metadata: { formData: data, sheets_outcome: sheetsOutcome, recipient_source: recipientSource, ...(emailResult.banner ? { banner: emailResult.banner } : {}) },
+      });
     });
 
     const skipped = "skipped" in result && result.skipped;

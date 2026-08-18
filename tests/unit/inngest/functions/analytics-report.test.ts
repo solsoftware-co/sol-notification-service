@@ -83,6 +83,7 @@ const mockClient: ClientRecord = {
   created_at: new Date(),
   google_service_account_email: null,
   google_service_account_key: null,
+  slack_webhook_url: null,
   timezone: "America/Chicago",
 };
 
@@ -102,7 +103,6 @@ const mockReport: AnalyticsReport = {
   topPages: [{ path: "/", views: 200 }],
   dailyMetrics: [{ date: "20260216", sessions: 14, activeUsers: 11, newUsers: 4 }],
   resolvedPeriod: mockResolvedPeriod,
-  isMock: true,
 };
 
 const mockEmailResult: EmailResult = {
@@ -167,9 +167,14 @@ function freshEngine() {
 beforeEach(() => {
   vi.resetAllMocks();
   (config as any).emailMode = "mock"; // reset to default before each test
+  (config as any).env = "development"; // reset to default before each test
   mockGetClientById.mockResolvedValue(mockClient);
+  // Default: a fully configured client — ga4_property_id (set on mockClient) and a
+  // credential. fetch-analytics-data now skips unconditionally when either is missing,
+  // so the happy-path default needs both; tests for the missing-config paths override
+  // this per-test.
   mockGetClientGoogleCredentials.mockResolvedValue({
-    google_service_account_key: mockClient.google_service_account_key,
+    google_service_account_key: '{"type":"service_account"}',
   });
   mockGetAnalyticsReport.mockResolvedValue(mockReport);
   mockSendEmail.mockResolvedValue(mockEmailResult);
@@ -397,7 +402,6 @@ describe("full execute — happy path, last_week", () => {
         preset: "last_week",
       },
       outcome: "logged",
-      isMock: true,
     });
   });
 
@@ -405,7 +409,7 @@ describe("full execute — happy path, last_week", () => {
     await freshEngine().execute();
 
     expect(mockRenderAnalyticsReport).toHaveBeenCalledWith(
-      expect.objectContaining({ sessions: 100, isMock: true }),
+      expect.objectContaining({ sessions: 100 }),
       expect.objectContaining({ id: "client-1" }),
       expect.objectContaining({ preset: "last_week" }),
     );
@@ -438,7 +442,7 @@ describe("send-email — notification preferences", () => {
         { id: "resolve-send-time", handler: () => scheduledAt },
         { id: "wait-for-send-window", handler: () => undefined },
         { id: "resolve-report-period", handler: () => mockResolvedPeriod },
-        { id: "fetch-analytics-data", handler: () => mockReport },
+        { id: "fetch-analytics-data", handler: () => ({ skipped: false, report: mockReport }) },
       ],
     });
 
@@ -459,7 +463,7 @@ describe("send-email — notification preferences", () => {
         { id: "resolve-send-time", handler: () => scheduledAt },
         { id: "wait-for-send-window", handler: () => undefined },
         { id: "resolve-report-period", handler: () => mockResolvedPeriod },
-        { id: "fetch-analytics-data", handler: () => mockReport },
+        { id: "fetch-analytics-data", handler: () => ({ skipped: false, report: mockReport }) },
       ],
     });
 
@@ -483,7 +487,7 @@ describe("send-email — notification preferences", () => {
         { id: "resolve-send-time", handler: () => scheduledAt },
         { id: "wait-for-send-window", handler: () => undefined },
         { id: "resolve-report-period", handler: () => mockResolvedPeriod },
-        { id: "fetch-analytics-data", handler: () => mockReport },
+        { id: "fetch-analytics-data", handler: () => ({ skipped: false, report: mockReport }) },
       ],
     });
 
@@ -497,37 +501,42 @@ describe("send-email — notification preferences", () => {
 });
 
 // ---------------------------------------------------------------------------
-// T011: check-ga4-config step
+// T011: fetch-analytics-data — GA4 config check (merged with the credential
+// fetch, since both fields need to be known before deciding whether to skip)
 // ---------------------------------------------------------------------------
 
-describe("check-ga4-config — client has GA4 property", () => {
-  it("does not skip — function completes and sends email", async () => {
+describe("fetch-analytics-data — client has GA4 property and credentials", () => {
+  it("does not skip — fetches the real report and sends email", async () => {
+    const { result } = await freshEngine().execute();
+
+    expect(result).toMatchObject({ clientId: "client-1", outcome: "logged" });
+    expect(mockGetAnalyticsReport).toHaveBeenCalledWith(
+      mockResolvedPeriod,
+      "123456789",
+      '{"type":"service_account"}',
+      expect.anything()
+    );
+    expect(mockSendEmail).toHaveBeenCalledOnce();
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
+  });
+
+  it("behaves the same in every environment — no config.env branching left in this step", async () => {
+    (config as any).env = "preview";
+
     const { result } = await freshEngine().execute();
 
     expect(result).toMatchObject({ clientId: "client-1", outcome: "logged" });
     expect(mockSendEmail).toHaveBeenCalledOnce();
-    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
   });
 });
 
-describe("check-ga4-config — client has no GA4 property, emailMode mock", () => {
-  it("proceeds and sends email (non-live mode falls back to mock analytics data)", async () => {
+describe("fetch-analytics-data — client has no GA4 property", () => {
+  it("skips and writes a failed log — regardless of environment", async () => {
     mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
-
-    const { result } = await freshEngine().execute();
-
-    // In mock/test/mailtrap modes, analytics.ts returns mock data when GA4 is absent,
-    // so the workflow should complete normally rather than skipping.
-    expect(result).toMatchObject({ clientId: "client-1", outcome: "logged" });
-    expect(mockSendEmail).toHaveBeenCalledOnce();
-    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
-  });
-});
-
-describe("check-ga4-config — client has no GA4 property, emailMode live", () => {
-  it("writes a skipped log record and does not send email", async () => {
-    (config as any).emailMode = "live";
-    mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
+    // getAnalyticsReport() is the real source of truth for "not configured" now — it
+    // returns undefined itself, so the mock has to simulate that rather than the step
+    // deriving the skip decision from the client fields directly.
+    mockGetAnalyticsReport.mockResolvedValue(undefined);
 
     const { result } = await new InngestTestEngine({
       function: sendAnalyticsReport,
@@ -550,8 +559,8 @@ describe("check-ga4-config — client has no GA4 property, emailMode live", () =
   });
 
   it('skip-log subject is "Weekly Analytics Report" for last_week preset', async () => {
-    (config as any).emailMode = "live";
     mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
+    mockGetAnalyticsReport.mockResolvedValue(undefined);
 
     await freshEngine().execute();
 
@@ -561,8 +570,8 @@ describe("check-ga4-config — client has no GA4 property, emailMode live", () =
   });
 
   it('skip-log subject is "Monthly Analytics Report" for last_month preset', async () => {
-    (config as any).emailMode = "live";
     mockGetClientById.mockResolvedValue({ ...mockClient, ga4_property_id: null });
+    mockGetAnalyticsReport.mockResolvedValue(undefined);
 
     const engine = new InngestTestEngine({
       function: sendAnalyticsReport,
@@ -578,13 +587,40 @@ describe("check-ga4-config — client has no GA4 property, emailMode live", () =
   });
 });
 
+describe("fetch-analytics-data — client has GA4 property but no credentials", () => {
+  it("skips and writes a failed log — regardless of environment", async () => {
+    mockGetClientGoogleCredentials.mockResolvedValue({ google_service_account_key: null });
+    mockGetAnalyticsReport.mockResolvedValue(undefined);
+
+    const { result } = await new InngestTestEngine({
+      function: sendAnalyticsReport,
+      events: [baseEvent],
+      steps: [{ id: "wait-for-send-window", handler: () => undefined }],
+      transformCtx: (ctx: any) => mockCtx(ctx),
+    }).execute();
+
+    expect(result).toMatchObject({ clientId: "client-1", outcome: "skipped" });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
+    expect(mockWriteNotificationLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: "skipped",
+        error_message: "Client has no Google credentials configured",
+        client_id: "client-1",
+        workflow: "send-analytics-report",
+      })
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
-// T008: log-result step — writeNotificationLog guard
+// T008: log-result step — always writes to notification_logs, regardless of
+// environment. Each environment's SOL_API_URL already points at its own
+// isolated sol-api deployment, so there's no shared audit trail to guard.
 // ---------------------------------------------------------------------------
 
-describe("log-result — emailMode live", () => {
+describe("log-result", () => {
   it("calls writeNotificationLog with correct fields and metadata", async () => {
-    (config as any).emailMode = "live";
     mockSendEmail.mockResolvedValue(mockLiveEmailResult);
 
     await freshEngine().execute();
@@ -608,23 +644,61 @@ describe("log-result — emailMode live", () => {
       })
     );
   });
-});
 
-describe("log-result — emailMode mock", () => {
-  it("does not call writeNotificationLog", async () => {
+  it("still calls writeNotificationLog in non-production environments", async () => {
+    (config as any).env = "preview";
+
     await freshEngine().execute();
 
-    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
   });
 });
 
-describe("log-result — emailMode test", () => {
-  it("does not call writeNotificationLog", async () => {
-    (config as any).emailMode = "test";
+// ---------------------------------------------------------------------------
+// onFailure — fires after retries are exhausted
+// ---------------------------------------------------------------------------
 
-    await freshEngine().execute();
+function fakeFailureArgs() {
+  return {
+    event: {
+      data: {
+        run_id: "run-exhausted-1",
+        function_id: "send-analytics-report",
+        event: { data: { ...baseEvent.data } },
+        error: { name: "Error", message: "GA4 API unavailable" },
+      },
+    },
+    error: new Error("GA4 API unavailable"),
+    step: { run: async (_id: string, fn: () => unknown) => fn() },
+  };
+}
 
-    expect(mockWriteNotificationLog).not.toHaveBeenCalled();
+describe("onFailure", () => {
+  it("writes a failed notification log", async () => {
+    const onFailure = (sendAnalyticsReport as any).onFailureFn;
+
+    await onFailure(fakeFailureArgs());
+
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
+    expect(mockWriteNotificationLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client_id: "client-1",
+        workflow: "send-analytics-report",
+        event_name: "analytics/report.requested",
+        outcome: "failed",
+        subject: "Weekly Analytics Report",
+        error_message: "GA4 API unavailable",
+      })
+    );
+  });
+
+  it("writes the failed log regardless of environment", async () => {
+    (config as any).env = "preview";
+    const onFailure = (sendAnalyticsReport as any).onFailureFn;
+
+    await onFailure(fakeFailureArgs());
+
+    expect(mockWriteNotificationLog).toHaveBeenCalledOnce();
   });
 });
 
