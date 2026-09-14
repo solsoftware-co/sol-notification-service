@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/solsoftware-co/sol-notification-service/compare/v1.2.0...v1.2.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* point client reads at the frozen /legacy/clients endpoint ([8ce34ce](https://github.com/solsoftware-co/sol-notification-service/commit/8ce34ce9f4ed25ebdabff20829489c0e40fe47c3)), closes [#21](https://github.com/solsoftware-co/sol-notification-service/issues/21)
+
 # [1.2.0](https://github.com/solsoftware-co/sol-notification-service/compare/v1.1.7...v1.2.0) (2026-08-18)
 
 
