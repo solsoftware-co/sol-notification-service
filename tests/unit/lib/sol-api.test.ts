@@ -76,7 +76,7 @@ describe("getClientById", () => {
     expect(result).toEqual(mockClientRecord);
     const [url, init] = mockFetch.mock.calls[0];
     expect(url).toBe(
-      "https://sol-api-staging.solsoftware.workers.dev/v1/clients/client-acme"
+      "https://sol-api-staging.solsoftware.workers.dev/legacy/clients/client-acme"
     );
     expect((init.headers as Record<string, string>)["X-API-Key"]).toBe(
       "test-key"
@@ -106,7 +106,7 @@ describe("getClientSlackCredentials", () => {
     expect(result).toEqual({ slack_webhook_url: "https://hooks.slack.com/services/xyz" });
     const [url] = mockFetch.mock.calls[0];
     expect(url).toBe(
-      "https://sol-api-staging.solsoftware.workers.dev/v1/clients/client-acme?include=slack_credentials"
+      "https://sol-api-staging.solsoftware.workers.dev/legacy/clients/client-acme?include=slack_credentials"
     );
   });
 });
@@ -120,7 +120,7 @@ describe("getAllActiveClients", () => {
 
     const [url] = mockFetch.mock.calls[0];
     expect(url).toBe(
-      "https://sol-api-staging.solsoftware.workers.dev/v1/clients?limit=1"
+      "https://sol-api-staging.solsoftware.workers.dev/legacy/clients?limit=1"
     );
   });
 
@@ -131,7 +131,7 @@ describe("getAllActiveClients", () => {
 
     const [url] = mockFetch.mock.calls[0];
     expect(url).toBe(
-      "https://sol-api-staging.solsoftware.workers.dev/v1/clients"
+      "https://sol-api-staging.solsoftware.workers.dev/legacy/clients"
     );
   });
 

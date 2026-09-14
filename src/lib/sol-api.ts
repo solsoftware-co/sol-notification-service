@@ -35,11 +35,16 @@ async function solApiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return body.data;
 }
 
+// All client reads go through /legacy/clients — a frozen fork of the old
+// /v1/clients contract (sol-api PR #21). /v1/clients itself is being
+// redesigned around sol-api's new normalized data model and no longer
+// serves this shape; this service stays on the frozen fork until it's
+// decommissioned in favor of the new notification-service.
 export async function getClientById(id: string): Promise<ClientSummary> {
-  return solApiFetch<ClientSummary>(`/v1/clients/${encodeURIComponent(id)}`);
+  return solApiFetch<ClientSummary>(`/legacy/clients/${encodeURIComponent(id)}`);
 }
 
-// GET /v1/clients/:id excludes google_service_account_key by default;
+// GET /legacy/clients/:id excludes google_service_account_key by default;
 // ?include=google_credentials is the only way to get it back. Call this only
 // from inside the step that actually uses the key, never from a
 // general-purpose "fetch client config" step, so the credential never ends
@@ -48,18 +53,18 @@ export async function getClientGoogleCredentials(
   id: string
 ): Promise<ClientGoogleCredentials> {
   return solApiFetch<ClientGoogleCredentials>(
-    `/v1/clients/${encodeURIComponent(id)}?include=google_credentials`
+    `/legacy/clients/${encodeURIComponent(id)}?include=google_credentials`
   );
 }
 
-// Same pattern as getClientGoogleCredentials — GET /v1/clients/:id excludes
-// slack_webhook_url by default; ?include=slack_credentials opts back in.
-// Call this only from inside the step that actually posts to Slack.
+// Same pattern as getClientGoogleCredentials — GET /legacy/clients/:id
+// excludes slack_webhook_url by default; ?include=slack_credentials opts
+// back in. Call this only from inside the step that actually posts to Slack.
 export async function getClientSlackCredentials(
   id: string
 ): Promise<ClientSlackCredentials> {
   return solApiFetch<ClientSlackCredentials>(
-    `/v1/clients/${encodeURIComponent(id)}?include=slack_credentials`
+    `/legacy/clients/${encodeURIComponent(id)}?include=slack_credentials`
   );
 }
 
@@ -72,7 +77,7 @@ export async function getAllActiveClients(options?: {
   }
   const qs = params.toString();
 
-  // GET /v1/clients returns ClientSummary — google_service_account_key and
+  // GET /legacy/clients returns ClientSummary — google_service_account_key and
   // slack_webhook_url are omitted at the list level; callers that need them
   // fetch the full record via getClientGoogleCredentials/getClientSlackCredentials.
   const rows = await solApiFetch<
@@ -80,7 +85,7 @@ export async function getAllActiveClients(options?: {
       google_service_account_key?: string | null;
       slack_webhook_url?: string | null;
     })[]
-  >(`/v1/clients${qs ? `?${qs}` : ""}`);
+  >(`/legacy/clients${qs ? `?${qs}` : ""}`);
 
   return rows.map((row) => ({
     ...row,
