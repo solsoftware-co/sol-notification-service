@@ -94,10 +94,15 @@ export async function getAllActiveClients(options?: {
   }));
 }
 
+// Frozen fork of today's contract, same reasoning as the /legacy/clients
+// reads above: sol-api's /v1/notification-logs is being redesigned around a
+// new camelCase contract with additional fields (type/slack_webhook_url).
+// This service stays on the frozen snake_case fork until it's migrated to
+// the new notification-service.
 export async function writeNotificationLog(
   entry: NotificationLogEntry
 ): Promise<void> {
-  await solApiFetch<unknown>("/v1/notification-logs", {
+  await solApiFetch<unknown>("/legacy/notification-logs", {
     method: "POST",
     body: JSON.stringify({
       client_id: entry.client_id,

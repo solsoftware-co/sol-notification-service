@@ -155,7 +155,7 @@ describe("writeNotificationLog", () => {
 
     const [url, init] = mockFetch.mock.calls[0];
     expect(url).toBe(
-      "https://sol-api-staging.solsoftware.workers.dev/v1/notification-logs"
+      "https://sol-api-staging.solsoftware.workers.dev/legacy/notification-logs"
     );
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual({
