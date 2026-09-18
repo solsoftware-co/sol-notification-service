@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/solsoftware-co/sol-notification-service/compare/v1.2.1...v1.2.2) (2026-09-18)
+
+
+### Bug Fixes
+
+* point notification-log writes at the frozen /legacy/notification-logs endpoint ([7240205](https://github.com/solsoftware-co/sol-notification-service/commit/7240205f506b0c5d0b93744b36c9e54ba129d534))
+
 ## [1.2.1](https://github.com/solsoftware-co/sol-notification-service/compare/v1.2.0...v1.2.1) (2026-09-14)
 
 
